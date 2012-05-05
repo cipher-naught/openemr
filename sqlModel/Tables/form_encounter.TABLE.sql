@@ -1,0 +1,23 @@
+CREATE TABLE `form_encounter` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `date` datetime DEFAULT NULL,
+  `reason` longtext,
+  `facility` longtext,
+  `facility_id` int(11) NOT NULL DEFAULT '0',
+  `pid` bigint(20) DEFAULT NULL,
+  `encounter` bigint(20) DEFAULT NULL,
+  `onset_date` datetime DEFAULT NULL,
+  `sensitivity` varchar(30) DEFAULT NULL,
+  `billing_note` text,
+  `pc_catid` int(11) NOT NULL DEFAULT '5' COMMENT 'event category from openemr_postcalendar_categories',
+  `last_level_billed` int(11) NOT NULL DEFAULT '0' COMMENT '0=none, 1=ins1, 2=ins2, etc',
+  `last_level_closed` int(11) NOT NULL DEFAULT '0' COMMENT '0=none, 1=ins1, 2=ins2, etc',
+  `last_stmt_date` date DEFAULT NULL,
+  `stmt_count` int(11) NOT NULL DEFAULT '0',
+  `provider_id` int(11) DEFAULT '0' COMMENT 'default and main provider for this visit',
+  `supervisor_id` int(11) DEFAULT '0' COMMENT 'supervising provider, if any, for this visit',
+  `invoice_refno` varchar(31) NOT NULL DEFAULT '',
+  `referral_source` varchar(31) NOT NULL DEFAULT '',
+  PRIMARY KEY (`id`),
+  KEY `pid` (`pid`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1

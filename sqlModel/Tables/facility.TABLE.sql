@@ -1,0 +1,22 @@
+CREATE TABLE `facility` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(255) DEFAULT NULL,
+  `phone` varchar(30) DEFAULT NULL,
+  `fax` varchar(30) DEFAULT NULL,
+  `street` varchar(255) DEFAULT NULL,
+  `city` varchar(255) DEFAULT NULL,
+  `state` varchar(50) DEFAULT NULL,
+  `postal_code` varchar(11) DEFAULT NULL,
+  `country_code` varchar(10) DEFAULT NULL,
+  `federal_ein` varchar(15) DEFAULT NULL,
+  `service_location` tinyint(1) NOT NULL DEFAULT '1',
+  `billing_location` tinyint(1) NOT NULL DEFAULT '0',
+  `accepts_assignment` tinyint(1) NOT NULL DEFAULT '0',
+  `pos_code` tinyint(4) DEFAULT NULL,
+  `x12_sender_id` varchar(25) DEFAULT NULL,
+  `attn` varchar(65) DEFAULT NULL,
+  `domain_identifier` varchar(60) DEFAULT NULL,
+  `facility_npi` varchar(15) DEFAULT NULL,
+  `tax_id_type` varchar(31) NOT NULL DEFAULT '',
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM AUTO_INCREMENT=4 DEFAULT CHARSET=latin1
