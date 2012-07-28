@@ -100,8 +100,8 @@ if (preg_match("/^[^\/]/",$web_root)) {
 //   $web_root =  "/openemr";
 //
 
-$webserver_root = "C:/dev/OpenEMR/Source/MyOpenEMR/desktopOpenemr/openemr";
-$web_root =  "/openemrDev";
+#$webserver_root = "C:/dev/OpenEMR/Source/MyOpenEMR/desktopOpenemr/openemr";
+#$web_root =  "/openemrDev";
 
 // This is the directory that contains site-specific data.  Change this
 // only if you have some reason to.
