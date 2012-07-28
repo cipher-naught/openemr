@@ -1,0 +1,69 @@
+<?php
+class Zend_Helper_ArrayView extends Zend_View_Helper_Abstract 
+{
+	/**
+	 * Helper items related to Arrays.
+	 * @return Zend_Helper_ArrayView
+	 */
+	public function arrayView()
+	{
+		return $this;
+	}
+	/**
+	 * Use to create a list of items surrounded by $tag
+	 * @param array $items an array of items.
+	 * @param type of element $tag
+	 * @return string of items incased in tags.
+	 */
+	public function makeRepeatingList($items, $tag) {
+		$lcl = "";
+		foreach($items as $data)
+		{
+			$lcl .= "<".$tag.">".$data."</".$tag.">\n";
+		}
+		return $lcl;
+	}
+	/**
+	 * Create a list of list items.  Note: Does not generate ul tags.
+	 * @param array $items an arry of items to be returned as a List Item.
+	 * @return string
+	 */
+	public function makeLiList($items)
+	{
+		return $this->makeRepeatingList($items, "li");
+	}
+	
+	/**
+	 * Create a select itme
+	 * @param string $name name of select list to generate.
+	 * @param array $items array of items to be included.
+	 * @param array $values Optional, uses $items as select list items
+	 * @return Zend_Form_Element_Select 
+	 */
+	public function makeSelectList($name, $items,$values = NULL)
+	{
+			
+		
+		$lcl = new Zend_Form_Element_Select($name);
+		if(!isset($values)) {
+			foreach($items  as $data) {
+				$lcl->addMultiOption($data,$data);
+			}
+		}
+		elseif(count($items)== count($values)) { 
+			
+			$i = 0;
+			while($i < count($items))
+			{
+				$lcl->addMultiOption($values[$i],$items[$i]);
+				$i++;
+			}
+		}
+		else {
+			//stuff
+			//TODOCMP: Raise error
+		}
+		
+		return $lcl;
+	}
+}

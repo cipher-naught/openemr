@@ -1,0 +1,291 @@
+<?php 
+
+$form = $this->form;
+$this->form->setAction($this->url());
+?>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1" />
+<title>Data Importer</title>
+<script type="text/javascript">
+
+function SelectElement(valueToSelect,selectList)
+{    
+    var element = document.getElementById(selectList);
+    var isFound = false;
+
+    for (var i=0; i<element.options.length; i++)
+    {
+     if ( element.options[i].value == valueToSelect )
+     {
+    	 element.options[i].selected = true;
+      isFound = true;
+     }
+    }
+    if ( isFound == false )
+    	element.options[0].selected = true;
+}
+
+
+function SetElement(valueToSet,ElementID)
+{
+	var element = document.getElementById(ElementID);
+	if(valueToSet != 0)
+		element.value = valueToSet;
+}
+
+</script>
+
+
+<style>
+
+
+
+
+hr {
+  border: 0;
+  width: 80%;
+  color: #f00;
+  background-color: #f00;
+  height: 5px;
+}
+
+
+#leftContainer {
+  
+  width: 45%; 
+  
+  float:left;
+  border-style:solid;
+  border-color:red;
+  margin-left:10px;
+  margin-right:10px;
+  margin-top:10px;
+  height: 100%;
+  
+}
+
+#fileImport {
+  background: #EBEBEB;
+  border-style:solid;
+  padding:25px 50px;
+  margin-bottom:10px;
+  height:30%;
+  
+}
+
+#options {
+  background: #EBEBEB;
+  border-style:solid;
+  padding:25px 50px;
+  height:40%; 
+}
+
+#upperContainer {
+  margin:auto;
+  width: 800px; 
+  background: #ffffff;
+  border-width:10px;
+  height:400px;
+}
+#rightContainer {
+  float:right;
+  width: 45%; 
+  background: #f33fff;
+  height:100%;
+  margin-top:10px;
+  margin-bottom:10px;
+  margin-left:10px;
+}
+
+#tableInfo {
+  
+  margin:auto;
+  background-color: #EBEBEB;
+  border-style:solid;
+  height:100%;
+  width:100%;
+  
+}
+
+
+
+#columnList {
+  background:white;
+  overflow:auto;
+  height:200px;
+  
+}
+
+#bottomContainer {
+  
+  width: 800px; 
+  margin:auto;
+  
+  border-width:10px;
+  height:600px;
+}
+
+#importPreview { /* this is the bottom */
+  margin-top:10px;
+  margin-bottom:10px;
+  margin-left:10px;
+  margin-right:20px;
+  padding:10px 10px;
+  float:left;
+  width: 770px;
+  height:50%;
+   
+  background: #EBEBEB; 
+  border-style:solid;
+  overflow:auto;
+  /*box-shadow: 10px 10px 5px #888888; can be added*/
+}
+
+#buttonContainer {
+	margin:auto;
+	height: 50px;
+	width: 800px; 
+	border-width:10px;
+	padding:10px 10px;
+}
+
+
+</style>
+</head>
+<body>
+<br/>
+<br/>
+<br/>
+<br/>
+<form method="<?php echo $form->getMethod() ?>" action="<?php echo $form->getAction()?>" enctype="<?php echo $form->getAttrib('enctype')?>">
+	<div id="buttonContainer">
+<span style="float:left;"><button type="button">Load Import Script</button></span>
+<span style="float:right;"><?php echo $form->getElement('processFile')->render(); ?></span> 
+
+<?php echo $form->getElement('hidTableData')->render(); ?>
+</div>
+
+<div id="upperContainer">
+	<div id="leftContainer">
+			<div id="fileImport">
+			File to Import <br/>
+			<?php echo $form->getElement('dataFile')->render(); ?>
+			<?php echo $form->getElement('uploadFile')->render(); ?>
+			</div>
+			<div id="options">
+			Basic Options<br/>
+			<table> 
+			<tr>
+			<td><a href="http://www.asciitable.com/">ASCII Chart 
+			<img src="../../../../images/new_window_icon.gif" alt="Ascii Chart link"/>
+			</a></td>
+			</tr>
+			<tr>
+			<td>Field Delimiters </td>
+			<td>
+			
+			
+			<?php echo $form->getElement('fieldDelimit')->render(); ?> 
+			
+			
+			</td>
+			<td><?php echo $form->getElement('fieldDelimitBox')->render(); ?>
+    	
+    	
+    	<br/></td>
+			</tr>
+			
+			<tr>
+			
+			<td>
+			Text Qualifier </td><td><?php echo $form->getElement('txtQualifier')->render(); ?></td>
+			<td><?php echo $form->getElement('txtQualifierBox')->render(); ?></td>
+			</tr>
+			</table>
+			<hr/>
+			Advanced Options<br/>
+			<table>
+			<tr>
+				<td>Text Encoding</td>
+				<td><?php echo $form->getElement('txtEncoding')->render(); ?></td>
+				
+			</tr>
+			</table>
+			 
+			
+			
+			</div>
+		</div>
+		<div id="rightContainer">
+			<div id="tableInfo">
+			Table Info<br/>
+			<?php 
+			
+			echo $form->getElement('tableList')->render(); 
+			?>
+			
+			
+			<br/>
+			<input type="checkbox"/> Create Temp Table<br/>
+			List of Columns:
+			<div id="columnList" >
+			<ul>
+<?php 
+	echo $this->ArrayView()->makeLiList($form->columnListSet);
+	
+?>
+			</ul>
+			
+			
+			</div>
+		</div>
+</div>
+<div id="spacer">
+</div>
+</div>
+</div>
+
+<br/>
+
+<hr class="middleBar"/>
+<div id="bottomContainer">
+	<div id="importPreview">
+	Import Previews<br/>
+	Number of Rows to Preview: <select>
+	 <option value="10">10</option>
+	 <option value="40">40</option>
+	 <option value="100">100</option>
+	 </select>
+	 <br/>
+	<?php 
+	
+	if($form->previewTableStatus == "render") {
+		//Add skip, send in select list
+		//generateTable($tableData, $listOfColumns, $columnChoice = null)
+		$lclTest = $form->previewTableData[0];
+		echo $this->TableViewHelper()->generateTable($form->previewTableData[0],
+                                                     
+                                               $form->columnListSet,
+                                               $form->previewTableData[1]
+                                       );
+	}
+	else {
+		echo $form->previewTableStatusMessage;
+	}
+			
+	//echo $form->previewTable; 
+	
+	?>
+	
+	</div>
+<br/>
+
+<?php
+//echo $this->dataBaseTables()->tableList();
+?>
+</div>
+</form>
+
+</body>
+</html>
