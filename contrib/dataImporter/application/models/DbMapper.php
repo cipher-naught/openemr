@@ -48,6 +48,7 @@ class Application_Model_DbMapper
 		return $this->$method();
 
 	}
+	
 	public function __set($name, $value)
 	{
 		$method = 'set' . $name;

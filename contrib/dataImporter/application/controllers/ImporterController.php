@@ -116,7 +116,7 @@ class ImporterController extends Zend_Controller_Action
     							true);
     				
     					//$this->previewTable = $lcl;
-    					$form->setValue('hidTableData') = base64_encode($form->previewTableData);
+    					//$form->setValue('hidTableData') = base64_encode($form->previewTableData);
     				}
     			}  
     			elseif($_POST['processFile']) { //Process File, sending to Review "action"
@@ -159,15 +159,15 @@ class ImporterController extends Zend_Controller_Action
     			}
     			else {
 
-    				if(isset($form->getValue('hidTableData'))) { //we have post back data
+    				//if(isset($form->getValue('hidTableData'))) { //we have post back data
     					
-    					$form->previewTableData = base_decode($form->getValue('hidTableData'));
+    					//$form->previewTableData = base_decode($form->getValue('hidTableData'));
 	    				//Repopulate data here
-    				}
-    				else {
+    				//}
+    				//else {
     					$form->previewTableStatus = "processing";
     					$form->previewTableStatusMessage = "Processing file, please wait";
-    				}
+    				//}
     			}
     		}
     		else {

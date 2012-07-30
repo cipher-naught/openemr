@@ -58,9 +58,9 @@ class Application_Model_CsvFileImportMapper
 				//$output = $output ."<tr>";
 				$rowscount = 0;
 				
-				if($txtEncoding != "UTF-8") {
-					$buffer = mb_convert_encoding($buffer, "UTF-8",$txtEncoding);
-				}
+				//if($txtEncoding != "UTF-8") {
+				//	$buffer = mb_convert_encoding($buffer, "UTF-8",$txtEncoding);
+				//}
 				//Some times csv files do not include text qualifiers like they should
 				//We automatically insert them if they are missing.
 				if(!strpos($buffer,$txtQualifier) ) {
