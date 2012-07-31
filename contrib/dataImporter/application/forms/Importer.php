@@ -176,7 +176,7 @@ class Application_Form_Importer extends Zend_Form
     	$this->addElement($fieldDelimitBox,'fieldDelimitBox');
     	
     	//Hidden Table Data.
-    	$hidTableData = new  Zend_Form_Element_Select('hidTableData');
+    	$hidTableData = new  Zend_Form_Element_Hidden('hidTableData');
     	$this->addElement($hidTableData,'hidTableData');
     	
     }

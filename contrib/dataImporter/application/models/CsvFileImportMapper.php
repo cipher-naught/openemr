@@ -63,12 +63,13 @@ class Application_Model_CsvFileImportMapper
 				//}
 				//Some times csv files do not include text qualifiers like they should
 				//We automatically insert them if they are missing.
-				if(!strpos($buffer,$txtQualifier) ) {
+				if(strpos($buffer,$txtQualifier) === false) {
 					$buffer = str_replace(",","\",\"",$buffer);
 					$buffer = "\"$buffer\"";
 				}
 				//If we fail to get a line, then just skip it.
-				if( !$line = str_getcsv($buffer, $fieldDelimit, $txtQualifier)
+				//if( !$line = str_getcsv($buffer, $fieldDelimiter, $txtQualifier)
+				if( !$line = str_getcsv($buffer)
 						&& ($counter ==0 && $firstRowIsColumnHeaders)) { //skip first row if it contains column information.
 					continue;
 				}

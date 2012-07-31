@@ -87,8 +87,8 @@ class ImporterController extends Zend_Controller_Action
     		//Is included for consistency with the Zend framework.
     		if($form->isValid($request->getPost())) {
     			//Remove.
-    			$txtQualifier = 13;
-				$fieldDelimit = 22;
+
+
     			if(isset($_POST['uploadFile']) && isset($_FILES['dataFile']['type']) ) {
     				if(isset($_SESSION['fileLocation'])) {
     					unset($_SESSION['fileLocation']);
@@ -111,8 +111,8 @@ class ImporterController extends Zend_Controller_Action
     					//$tableListMapper = new Application_Model_DbMapper();
     					//$form->columnListSet = $tableListMapper->columnList($form->getValue('tableList'));
     					$form->previewTableData = $csvProcessor->generateTableArray($fileLocation,  $form->getValue('tableList'),
-    							$form->getValue('fieldDelimitBox'),
-    							$form->getValue('txtQualifierBox'),
+    							chr($form->getValue('fieldDelimitBox')),
+    							chr($form->getValue('txtQualifierBox')),
     							true);
     				
     					//$this->previewTable = $lcl;
