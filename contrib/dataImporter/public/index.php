@@ -1,9 +1,16 @@
 <?php
+set_include_path(get_include_path() . PATH_SEPARATOR . dirname(__FILE__). '/../../../library/zend_framework_1.11/library');
+
+//Set OpenEMR includes
+include_once("../../../interface/globals.php");
+include_once("../../../library/api.inc");
+require_once("../../../library/classes/ORDataObject.class.php");
 
 // Define path to application directory
 defined('APPLICATION_PATH')
     || define('APPLICATION_PATH', realpath(dirname(__FILE__) . '/../application'));
 
+    
 // Define application environment
 defined('APPLICATION_ENV')
     || define('APPLICATION_ENV', (getenv('APPLICATION_ENV') ? getenv('APPLICATION_ENV') : 'production'));
@@ -22,11 +29,6 @@ $application = new Zend_Application(
     APPLICATION_ENV,
     APPLICATION_PATH . '/configs/application.ini'
 );
-
-//Set OpenEMR includes
-include_once("../../../interface/globals.php");
-include_once("../../../library/api.inc");
-require_once("../../../library/classes/ORDataObject.class.php");
 
 //Zend_Controller_Front::run(realpath(dirname(__FILE__) . '/../application/controllers'));
 //Question

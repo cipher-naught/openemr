@@ -177,7 +177,7 @@ hr {
 			Basic Options<br/>
 			<table> 
 			<tr>
-			<td><a href="http://www.asciitable.com/">ASCII Chart 
+			<td><a href="http://www.asciitable.com/"  target="_blank">ASCII Chart 
 			<img src="../../../../images/new_window_icon.gif" alt="Ascii Chart link"/>
 			</a></td>
 			</tr>
@@ -230,12 +230,12 @@ hr {
 			<input type="checkbox"/> Create Temp Table<br/>
 			List of Columns:
 			<div id="columnList" >
-			<ul>
+			
 <?php 
-	echo $this->ArrayView()->makeLiList($form->columnListSet);
+	echo $this->ArrayView()->makeAlternatingDiv($form->columnListSet,"yellow");
 	
 ?>
-			</ul>
+			
 			
 			
 			</div>

@@ -88,12 +88,10 @@ class Application_Form_Importer extends Zend_Form
     	$localSelect->addMultiOption("ISO-8859-13","ISO-8859-13");
     	$localSelect->addMultiOption("ISO-8859-14","ISO-8859-14");
     	$localSelect->addMultiOption("ISO-8859-15","ISO-8859-15");
-    	$localSelect->addMultiOption("UTF-32","UTF-32");
-    	$localSelect->addMultiOption("UTF-32BE","UTF-32BE");
-    	$localSelect->addMultiOption("UTF-32LE","UTF-32LE");
-    	$localSelect->addMultiOption("UTF-16","UTF-16");
-    	$localSelect->addMultiOption("UTF-16BE","UTF-16BE");
-    	$localSelect->addMultiOption("UTF-16LE","UTF-16LE");
+    	
+    	$localSelect->addMultiOption('UTF-16BE','UTF-16BE');
+    	$localSelect->addMultiOption('UTF-16LE','UTF-16LE');
+    	
     	
     	return $localSelect;
     

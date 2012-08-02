@@ -66,4 +66,17 @@ class Zend_Helper_ArrayView extends Zend_View_Helper_Abstract
 		
 		return $lcl;
 	}
+	
+	public function makeAlternatingDiv($arrayOfItems, $altColor) {
+		$lcl = "";
+		for($i = 0; $i < count($arrayOfItems); $i++) {
+			if($i % 2 != 0) {
+				$lcl .= "<div style=\"background-color:".$altColor.";\">".$arrayOfItems[$i]. "</div>";
+			}
+			else {
+				$lcl .= "<div style=\"background-color:white;\">".$arrayOfItems[$i]. "</div>";
+			}
+		}
+		return $lcl;			
+	}
 }

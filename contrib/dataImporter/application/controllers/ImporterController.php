@@ -90,12 +90,13 @@ class ImporterController extends Zend_Controller_Action
 
 
     			if(isset($_POST['uploadFile']) && isset($_FILES['dataFile']['type']) ) {
-    				if(isset($_SESSION['fileLocation'])) {
-    					unset($_SESSION['fileLocation']);
-    				}
-    				else {
+    				//TODOCMP: Removed since no longer seems needed.
+    				//if(isset($_SESSION['fileLocation'])) {
+    				//	unset($_SESSION['fileLocation']);
+    				//}
+    				//else {
     					$csvProcessor = new Application_Model_CsvFileImportMapper();
-    					$fileLocation = $csvProcessor->moveTemp($_FILES['dataFile']['tmp_name'], $_FILES['dataFile']['name'], session_id());
+    					$fileLocation = $csvProcessor->moveTempAndEncode($_FILES['dataFile']['tmp_name'], $_FILES['dataFile']['name'],$form->getValue('txtEncoding'));
     					//$tableName = $form->getValue('tableList');
     					$_SESSION['fileLocation'] = $fileLocation;
     					 
@@ -113,11 +114,12 @@ class ImporterController extends Zend_Controller_Action
     					$form->previewTableData = $csvProcessor->generateTableArray($fileLocation,  $form->getValue('tableList'),
     							chr($form->getValue('fieldDelimitBox')),
     							chr($form->getValue('txtQualifierBox')),
+    							$form->getValue('txtEncoding'),
     							true);
     				
     					//$this->previewTable = $lcl;
     					//$form->setValue('hidTableData') = base64_encode($form->previewTableData);
-    				}
+    				//}
     			}  
     			elseif($_POST['processFile']) { //Process File, sending to Review "action"
     				

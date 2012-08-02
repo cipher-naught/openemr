@@ -6,6 +6,7 @@ class Application_Model_CsvFileImportMapper
 	
 	private $returnSQL = false; //Should the SQL be run directly or stored as an array.
 	private $uploadLocation = "" ;
+	protected $systemLocale;
 	
 	//"C:/dev/OpenEMR/Source/MyOpenEMR/desktopOpenemr/openemr/sites/default/documents/";
 	private $_listOfColumns; //Columns of the table
@@ -34,13 +35,24 @@ class Application_Model_CsvFileImportMapper
 	 * @param string $randVal value to prepend to file being created.
 	 * @return string full path to the file being created
 	 */
-	public function moveTemp($fileNameFull, $fileName, $randVal) {
-		$fileLocation = $this->uploadLocation ."/". $randVal ."-".$fileName;
-		move_uploaded_file($fileNameFull, $fileLocation);
+	public function moveTempAndEncode($fileNameFull, $fileName,  $txtEncoding) {
+		
+		$fileLocation = $this->uploadLocation ."/".$fileName;
+		if($txtEncoding != "utf8") {
+			$this->convertEncoding($fileNameFull, $fileLocation,$txtEncoding );
+		}
+		else {
+			move_uploaded_file($fileNameFull, $fileLocation);
+		}
 		return $fileLocation;
 	}
 	
-
+	protected function convertEncoding($fromFile, $toFile, $txtEncoding) {
+		$buf = mb_convert_encoding(file_get_contents($fromFile), "utf8", $txtEncoding);
+		$fp = fopen($toFile, "w") or die();
+		fwrite($fp, $buf);
+		fclose($fp);
+	}
 
 	public function generateTableArray($fileName, $tableName, $fieldDelimiter, $txtQualifier, $firstRowColumnNames = false) {
 		$output = array();
@@ -49,67 +61,56 @@ class Application_Model_CsvFileImportMapper
 		$fp = fopen($fileName, "r") or die(); //TODOCMP: Add die erorr
 		//$length = 4096; /// have to be optional length ...
 		
-		$counter = 0; // to omission first row if it is table headers, 0 => Skip first row
+		$lineCounter = 0; // to omission first row if it is table headers, 0 => Skip first row
 		$withError = false;
 		$prevRowCount = 0;
-				
-		while(($buffer = fgets($fp)) !== false) {
+		
+		
+		
+		while(!feof($fp)) {
 				$rowArray = array();
 				//$output = $output ."<tr>";
 				$rowscount = 0;
-				
-				//if($txtEncoding != "UTF-8") {
-				//	$buffer = mb_convert_encoding($buffer, "UTF-8",$txtEncoding);
-				//}
-				//Some times csv files do not include text qualifiers like they should
-				//We automatically insert them if they are missing.
-				if(strpos($buffer,$txtQualifier) === false) {
-					$buffer = str_replace(",","\",\"",$buffer);
-					$buffer = "\"$buffer\"";
-				}
-				//If we fail to get a line, then just skip it.
-				//if( !$line = str_getcsv($buffer, $fieldDelimiter, $txtQualifier)
-				if( !$line = str_getcsv($buffer)
-						&& ($counter ==0 && $firstRowIsColumnHeaders)) { //skip first row if it contains column information.
-					continue;
-				}
-				
-				for($rowscount=0; $rowscount< count($line); $rowscount++) {
-					// For example insert in 3 column (e.g. id, name, email )
-						
-					//$columns = array_push($columns, $key);
-					if($firstRowColumnNames && $counter == 0) {
-						isset($columnMatch) ? : $columnMatch = array();
-						array_push($columnMatch,$line[$rowscount]); 
-						
+				if(($buffer = fgetcsv($fp, 4096, $fieldDelimiter)) !== false) {
+					
+					
+					//TODOCMP: fix
+					//if($txtEncoding != "UTF-8") {
+					//	$buffer = mb_convert_encoding($buffer, "UTF-8",$txtEncoding);
+					//}
+					
+					for($rowscount=0; $rowscount< count($buffer); $rowscount++) {
+						// For example insert in 3 column (e.g. id, name, email )
+							
+						//$columns = array_push($columns, $key);
+						if($firstRowColumnNames && $lineCounter == 0) {
+							isset($columnMatch) ? : $columnMatch = array();
+							array_push($columnMatch,utf8_encode($buffer[$rowscount])); 
+							
+						}
+						else {
+							//$output = $output . "<td>" .$value ."</td>";
+							array_push($rowArray,$buffer[$rowscount]);
+						}
 					}
-					else {
-						//$output = $output . "<td>" .$value ."</td>";
-						array_push($rowArray,$line[$rowscount]);
+					//Note: Rowcount will be one more than the numbers of columns
+					if($lineCounter == 0) { //Set $prevRowCount;
+						$prevRowCount = $rowscount; 
+					}	
+					if($prevRowCount != $rowscount) {
+						$withError = true;
+						break;	
 					}
+					if(!($lineCounter == 0 && $firstRowColumnNames))  {//If not header row.
+						array_push($output, $rowArray);					
+					}
+					$lineCounter++;
 				}
-				//Note: Rowcount will be one more than the numbers of columns
-				if($counter == 0) { //Set $prevRowCount;
-					$prevRowCount = $rowscount; 
-				}	
-				if($prevRowCount != $rowscount) {
-					$withError = true;
-					break;	
-				}
-				if(!($counter == 0 && $firstRowColumnNames))  {//If not header row.
-					array_push($output, $rowArray);					
-				}
-				
-				
-				//$output = $output ."</tr>";
-				
-				$counter++;
 			
 		}
 		fclose($fp);
-
 		
-			
+
 		if($firstRowColumnNames) {
 			return array($output,$columnMatch);
 		}
