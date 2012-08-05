@@ -57,6 +57,15 @@ class Application_Form_Importer extends Zend_Form
     	return $localSelect;    	 
     }
     
+    public function createRowLimitList($name) {
+    	$localSelect = new Zend_Form_Element_Select($name);
+    	$this->clearDecorators($localSelect);
+    	$localSelect->addMultiOption("10","10");
+    	$localSelect->addMultiOption("40","40");
+    	$localSelect->addMultiOption("100","100");
+    	return $localSelect;
+    }
+    
     /**
      * Creates Text Encoding drop down list.
      * @param string $name
@@ -69,8 +78,8 @@ class Application_Form_Importer extends Zend_Form
     	$localSelect = new Zend_Form_Element_Select($name);
     	$this->clearDecorators($localSelect);
     
-    	$localSelect->addMultiOption("ASCII","ASCII");
-    	$localSelect->addMultiOption("UTF-8","UTF-8");
+    	$localSelect->addMultiOption("UTF-7","ASCII");
+    	$localSelect->addMultiOption("utf8","UTF-8");
     	$localSelect->addMultiOption("EUC-JP","EUC-JP");
     	$localSelect->addMultiOption("eucJP-win","eucJP-win");
     	$localSelect->addMultiOption("JIS","JIS");
@@ -108,6 +117,43 @@ class Application_Form_Importer extends Zend_Form
     	$item->removeDecorator('Label');
     }
     
+    public function createFileList($name) {
+    	$localSelect = new Zend_Form_Element_Select($name);
+    	//TODOCMP: Change to configured value
+    	$list = $this->getFileList("C:/dev/OpenEMR/Source/MyOpenEMR/desktopOpenemr/openemr/sites/default/uploadCache");
+    	foreach($list as $value){
+    		$localSelect->addMultiOption($value,$value);
+    	} 
+    	
+    	$localSelect->setAttribs(array(
+    			"size" => 4,
+    			
+    			)
+    	);
+    	
+    	return $localSelect;
+    	
+    	
+    }
+    
+    public function getFileList($dirName) {
+    	
+    	$returnList = array();
+    	if ($handle = opendir($dirName)) {
+    		while (false !== ($entry = readdir($handle))) {
+    			if ($entry != "." && $entry != "..") {
+    				if (is_dir($entry) !== true){
+							array_push($returnList, $entry);
+    					
+    				}
+    				
+    			}
+    		}
+    		closedir($handle);
+    	}
+    	
+    	return $returnList;
+    }
     public function init()
     {
         /* Form Elements & Other Definitions Here ... */
@@ -135,9 +181,30 @@ class Application_Form_Importer extends Zend_Form
     	$fileUpload->setLabel("Upload File");
     	
     	$this->addElement($fileUpload,'uploadFile');
+    	
+    	$fileApply = new Zend_Form_Element_Submit('apply');
+    	$fileApply->setLabel("Apply");
+    	 
+    	$this->addElement($fileApply,'apply');
+
+    	
+    	$fileDelete = new Zend_Form_Element_Submit('delete');
+    	$fileDelete->setAttribs(array(
+    			"onclick" => "return ConfirmFileDelete(this)"
+    			)
+    	);
+    	$fileDelete->setLabel("delete");
+    	
+    	$this->addElement($fileDelete,'delete');
+    	
     	$fileProcess = new Zend_Form_Element_Submit('processFile');
     	$fileProcess->setLabel("Process File");
-    	 
+    	
+    	$fileProcess->setAttribs(array(
+    			"onclick" => "return ConfirmFileProcess(this)"
+    	)
+    	);
+    	
     	$this->addElement($fileProcess,'processFile');
     	
     	$view = $this->getView();
@@ -173,9 +240,19 @@ class Application_Form_Importer extends Zend_Form
     	$fieldDelimitBox->setValue($fieldDelimit->getValue());
     	$this->addElement($fieldDelimitBox,'fieldDelimitBox');
     	
+    	$firstRowColumnHeading = new Zend_Form_Element_CheckBox("firstRowColumnHeading");
+    	$this->addElement($firstRowColumnHeading ,'firstRowColumnHeading');
+    	
+    	
     	//Hidden Table Data.
     	$hidTableData = new  Zend_Form_Element_Hidden('hidTableData');
     	$this->addElement($hidTableData,'hidTableData');
+    	
+
+    	 
+    	$this->addElement($this->createFileList("fileList"), "fileList");
+    	
+    	$this->addElement($this->createRowLimitList('rowLimitList'),'rowLimitList');
     	
     }
 

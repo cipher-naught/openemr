@@ -95,31 +95,15 @@ class ImporterController extends Zend_Controller_Action
     				//	unset($_SESSION['fileLocation']);
     				//}
     				//else {
-    					$csvProcessor = new Application_Model_CsvFileImportMapper();
-    					$fileLocation = $csvProcessor->moveTempAndEncode($_FILES['dataFile']['tmp_name'], $_FILES['dataFile']['name'],$form->getValue('txtEncoding'));
-    					//$tableName = $form->getValue('tableList');
-    					$_SESSION['fileLocation'] = $fileLocation;
-    					 
-    					$form->previewTableStatus = "render";
-    					$form->previewTableStatusMessage = NULL;
-    					 
-    					
-    					$tableListMapper = new Application_Model_DbMapper();
-    					 
-    					$form->columnListSet = $tableListMapper->columnList( $form->getValue('tableList'));
-    					
-    					
-    					//$tableListMapper = new Application_Model_DbMapper();
-    					//$form->columnListSet = $tableListMapper->columnList($form->getValue('tableList'));
-    					$form->previewTableData = $csvProcessor->generateTableArray($fileLocation,  $form->getValue('tableList'),
-    							chr($form->getValue('fieldDelimitBox')),
-    							chr($form->getValue('txtQualifierBox')),
-    							$form->getValue('txtEncoding'),
-    							true);
+
+    				
     				
     					//$this->previewTable = $lcl;
     					//$form->setValue('hidTableData') = base64_encode($form->previewTableData);
     				//}
+    				$csvProcessor = new Application_Model_CsvFileImportMapper();
+    				$csvProcessor->moveTemp($_FILES['dataFile']['tmp_name'], $_FILES['dataFile']['name']);
+    				
     			}  
     			elseif($_POST['processFile']) { //Process File, sending to Review "action"
     				
@@ -143,21 +127,76 @@ class ImporterController extends Zend_Controller_Action
     					$lclVal = $_POST[$colName];
     				}
     				
-    				$encodingRules = array(
-    						"txtEncoding" => $form->getValue('txtEncoding'),
-    						"fieldDelimit" => chr($fieldDelimit),//44 => comma
-    						"txtQualifier" => chr($txtQualifier), //34 => "
-    						
-    						);
+    				//$encodingRules = array(
+    				//		"txtEncoding" => $form->getValue('txtEncoding'),
+    				//		"fieldDelimit" => chr($fieldDelimit),//44 => comma
+    				//		"txtQualifier" => chr($txtQualifier), //34 => "
+    				//
+    				//		);
+    				//
+    				//$_SESSION['fileImportProcessData'] = 
+    				//	array(
+    				//		"table" => $form->getValue('tableList'),
+    				//		"columnRules" => $columnRules,
+    				//	    "firstRowIsColumnHeaders" => false,
+    				//		"encodingRules" => $encodingRules				
+    				//	);
     				
-    				$_SESSION['fileImportProcessData'] = 
-    					array(
-    						"table" => $form->getValue('tableList'),
-    						"columnRules" => $columnRules,
-    					    "firstRowIsColumnHeaders" => false,
-    						"encodingRules" => $encodingRules				
-    					);
-    				$this->_redirect("importer/review");
+    				$csvProcessor = new Application_Model_CsvFileImportMapper();
+    				
+    				$importSuccess = $csvProcessor->importFile($csvProcessor->uploadLocationFromFile($form->getValue('fileList')), //FileName
+    						$form->getValue('tableList'), //Table
+    						$columnRules, //Column Rules
+    						$form->getValue('txtEncoding'), //Encoding
+    						chr($form->getValue('fieldDelimitBox')), 
+    						chr($form->getValue('txtQualifierBox')),
+    						intval($form->getValue('firstRowColumnHeading')) //Column Headings
+    				
+    				);
+    				
+    				if($importSuccess) {
+    					$this->_redirect("importer/review"); //???
+    				}
+    				else {
+    					//display message
+    				}
+    			}
+    			elseif ($_POST['delete']) {
+    				//Process are you sure delete
+    				
+    				//Need to set value to none.
+					//if answer to are you sure
+    				$csvProcessor = new Application_Model_CsvFileImportMapper();
+    				unlink($csvProcessor->uploadLocationFromFile($form->getValue('fileList')));
+					
+					
+    			}
+    			elseif ($_POST['apply']) {
+    				//Run processing
+    				$csvProcessor = new Application_Model_CsvFileImportMapper();
+    				//$csvProcessor->moveTempAndEncode($_FILES['dataFile']['tmp_name'], $_FILES['dataFile']['name'],$form->getValue('txtEncoding'));
+    				$fileLocationPointer = $csvProcessor->moveTempAndEncode($csvProcessor->uploadLocationFromFile($form->getValue('fileList')),$form->getValue('txtEncoding'));
+    				//$tableName = $form->getValue('tableList');
+    				//$_SESSION['fileLocation'] = $fileLocation;
+    				
+    				//TODOCMP: clean up and move
+    				//Move this into its own function
+    				$form->previewTableStatus = "render";
+    				$form->previewTableStatusMessage = NULL;
+    				
+    					
+    				$tableListMapper = new Application_Model_DbMapper();
+    				
+    				$form->columnListSet = $tableListMapper->columnList( $form->getValue('tableList'));
+    					
+    					
+    				//$tableListMapper = new Application_Model_DbMapper();
+    				//$form->columnListSet = $tableListMapper->columnList($form->getValue('tableList'));
+    				$form->previewTableData = $csvProcessor->generateTableArray($fileLocationPointer,  $form->getValue('tableList'),
+    						chr($form->getValue('fieldDelimitBox')), 
+    						chr($form->getValue('txtQualifierBox')),
+    						$form->getValue('firstRowColumnHeading'), $form->getValue('rowLimitList'));
+    				
     			}
     			else {
 

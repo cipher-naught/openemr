@@ -7,11 +7,20 @@ class Zend_Helper_TableViewHelper extends Zend_View_Helper_Abstract
 	public function generateTable($tableData, $listOfColumns, $columnChoice = NULL) {
 	
 		$output =  "<table border=\"1\"><tr>";
+		$i = 0;
+		$lclColumns = array_merge(array("skip"), $listOfColumns);
 		if(isset($columnChoice)) { 
 			foreach($columnChoice as $value) {
-				$lclColumns = array_merge(array("skip"), $listOfColumns);
 				$output = $output."<td>".$this->generateSelectList($lclColumns, $i, $value)."</td>";
 				$i++;
+			}
+			$output .= "</tr>\n";
+		}
+		else {
+			for($i=0;$i<count($tableData[0]); $i++)
+			{
+				$output = $output."<td>".$this->generateSelectList($lclColumns, $i)."</td>";
+			$i++;
 			}
 			$output .= "</tr>\n";
 		}

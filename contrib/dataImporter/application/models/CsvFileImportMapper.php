@@ -1,5 +1,7 @@
 <?php
 
+require_once (dirname(__FILE__) ."/../../../../library/sql.inc");
+
 class Application_Model_CsvFileImportMapper
 {
 	
@@ -25,7 +27,14 @@ class Application_Model_CsvFileImportMapper
 			}
 		}
 	}
+	public function getUploadLocation() {
+		return $this->uploadLocation;
+		
+	}	
 	
+	public function uploadLocationFromFile($fileName) {
+		return $this->uploadLocation."/".$fileName;
+	}
 	//Add getters and setters
 	//public function
 	/**
@@ -35,30 +44,36 @@ class Application_Model_CsvFileImportMapper
 	 * @param string $randVal value to prepend to file being created.
 	 * @return string full path to the file being created
 	 */
-	public function moveTempAndEncode($fileNameFull, $fileName,  $txtEncoding) {
+	public function moveTempAndEncode($fileNameFull, $txtEncoding) {
 		
-		$fileLocation = $this->uploadLocation ."/".$fileName;
+		//$fileLocation = $this->uploadLocation ."/".$fileName;
 		if($txtEncoding != "utf8") {
-			$this->convertEncoding($fileNameFull, $fileLocation,$txtEncoding );
+			return $this->convertEncoding($fileNameFull, tmpfile(),$txtEncoding );
 		}
-		else {
-			move_uploaded_file($fileNameFull, $fileLocation);
+		else { 
+			return open($fileNameFull,"r") or die();
 		}
-		return $fileLocation;
 	}
 	
-	protected function convertEncoding($fromFile, $toFile, $txtEncoding) {
+	public function moveTemp($tmpName, $newFileName) {
+		
+		move_uploaded_file($tmpName,  $this->uploadLocation ."/".$newFileName);
+	}
+	
+	public function convertEncoding($fromFile, $toFile, $txtEncoding) {
 		$buf = mb_convert_encoding(file_get_contents($fromFile), "utf8", $txtEncoding);
-		$fp = fopen($toFile, "w") or die();
-		fwrite($fp, $buf);
-		fclose($fp);
+		
+		fwrite($toFile, $buf);
+		rewind($toFile);
+		return $toFile;
 	}
 
-	public function generateTableArray($fileName, $tableName, $fieldDelimiter, $txtQualifier, $firstRowColumnNames = false) {
+	
+	public function generateTableArray($fileNamePointer, $tableName, $fieldDelimiter, $txtQualifier, $firstRowColumnNames = false, $numberOfRows =NULL) {
 		$output = array();
-		
+			
 		//If first, then do the number of rows		
-		$fp = fopen($fileName, "r") or die(); //TODOCMP: Add die erorr
+		//$fp = fopen($fileName, "r") or die(); //TODOCMP: Add die erorr
 		//$length = 4096; /// have to be optional length ...
 		
 		$lineCounter = 0; // to omission first row if it is table headers, 0 => Skip first row
@@ -66,49 +81,52 @@ class Application_Model_CsvFileImportMapper
 		$prevRowCount = 0;
 		
 		
-		
-		while(!feof($fp)) {
+		$rowCount = 0;		
+		while(!feof($fileNamePointer)) {
 				$rowArray = array();
 				//$output = $output ."<tr>";
-				$rowscount = 0;
-				if(($buffer = fgetcsv($fp, 4096, $fieldDelimiter)) !== false) {
-					
+				if($rowCount>$numberOfRows) {
+					break;
+				}
+				if(($buffer = fgetcsv($fileNamePointer, 4096, $fieldDelimiter)) !== false) {
 					
 					//TODOCMP: fix
 					//if($txtEncoding != "UTF-8") {
 					//	$buffer = mb_convert_encoding($buffer, "UTF-8",$txtEncoding);
 					//}
 					
-					for($rowscount=0; $rowscount< count($buffer); $rowscount++) {
+					for($colcount=0; $colcount< count($buffer); $colcount++) {
 						// For example insert in 3 column (e.g. id, name, email )
 							
 						//$columns = array_push($columns, $key);
 						if($firstRowColumnNames && $lineCounter == 0) {
 							isset($columnMatch) ? : $columnMatch = array();
-							array_push($columnMatch,utf8_encode($buffer[$rowscount])); 
+							array_push($columnMatch,utf8_encode($buffer[$colcount])); 
 							
 						}
 						else {
 							//$output = $output . "<td>" .$value ."</td>";
-							array_push($rowArray,$buffer[$rowscount]);
+							array_push($rowArray,$buffer[$colcount]);
 						}
 					}
 					//Note: Rowcount will be one more than the numbers of columns
 					if($lineCounter == 0) { //Set $prevRowCount;
-						$prevRowCount = $rowscount; 
+						$prevRowCount = $colcount; 
 					}	
-					if($prevRowCount != $rowscount) {
+					if($prevRowCount != $colcount) {
 						$withError = true;
 						break;	
 					}
 					if(!($lineCounter == 0 && $firstRowColumnNames))  {//If not header row.
-						array_push($output, $rowArray);					
+						array_push($output, $rowArray);		
+						$rowCount++;
 					}
+
 					$lineCounter++;
 				}
 			
 		}
-		fclose($fp);
+		fclose($fileNamePointer);
 		
 
 		if($firstRowColumnNames) {
@@ -132,20 +150,27 @@ class Application_Model_CsvFileImportMapper
 	 */
 	public function importFile($fileName, $tableName, $columnRules,$txtEncoding, $fieldDelimit, $txtQualifier, $firstRowIsColumnHeaders) {
 		
+		
+
+		
+		
+		
 		$fp = fopen($fileName, "r") or die("Unable to read uploaded file."); //Add die erorr
 		
+		$_db = $GLOBALS['adodb']['db'];
+		$_db->StartTrans();
 		$counter = 0; // to omission first row if it is table headers, 0 => Skip first row
-		$outputTotal = array();
+		
 		while(($buffer = fgets($fp)) !== false) {
 			if($txtEncoding != "UTF-8") {
-				$buffer = mb_convert_encoding($buffer, "UTF-8",$txtEncoding);
+				$buffer = mb_convert_encoding($buffer, "UTF8",$txtEncoding);
 			}
 			//Some times csv files do not include text qualifiers like they should
 			//We automatically insert them if they are missing.
-			if(!strpos($buffer,$txtQualifier) ) { 
-				$buffer = str_replace(",","\",\"",$buffer);
-				$buffer = "\"$buffer\"";
-			}
+			//if(!strpos($buffer,$txtQualifier) ) { 
+			//	$buffer = str_replace(",","\",\"",$buffer);
+			//	$buffer = "\"$buffer\"";
+			//}
 			//If we fail to get a line, then just skip it.
 			if( !$line = str_getcsv($buffer, $fieldDelimit, $txtQualifier) 
 					&& ($counter ==0 && $firstRowIsColumnHeaders)) { //skip first row if it contains column information.
@@ -167,11 +192,11 @@ class Application_Model_CsvFileImportMapper
 				}
 			}
 			//Character clean up and add to system			
-			array_push($outputTotal, rtrim($outputLine1,", "). ")".rtrim($outputLine2,", ").");\n\n");
+			$_db->sqlInsert(rtrim($outputLine1,", "). ")".rtrim($outputLine2,", ").");\n\n");
 			$counter++;
 		}
 		fclose($fp);
-		return $outputTotal;
+		return $_db->CompleteTrans();
 	}
 }
 
