@@ -104,6 +104,7 @@ if (preg_match("/^[^\/]/",$web_root)) {
 //   $webserver_root = "/var/www/openemr";
 //   $web_root =  "/openemr";
 //
+
 // This is the directory that contains site-specific data.  Change this
 // only if you have some reason to.
 $GLOBALS['OE_SITES_BASE'] = "$webserver_root/sites";
