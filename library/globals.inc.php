@@ -174,12 +174,21 @@ $GLOBALS_METADATA = array(
       xl('Omit insurance and some other things from the demographics form')
     ),
 
+    //Work by Cipher-Naught 2012/08/05 to add Data Import functionallity.  
+    'enable_Data_Import_in_left_menu' => array(
+       xl('Enable data import In Left Menu'),
+       'bool',                          // data type
+       '1',                             // default = true
+       xl('Enables data import In Left Menu.')
+    ),
+    
     'simplified_prescriptions' => array(
       xl('Simplified Prescriptions'),
       'bool',                           // data type
       '0',                              // default = false
       xl('Omit form, route and interval which then become part of dosage')
     ),
+
 
     'simplified_copay' => array(
       xl('Simplified Co-Pay'),
