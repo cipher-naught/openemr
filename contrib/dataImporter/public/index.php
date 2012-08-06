@@ -1,4 +1,13 @@
 <?php
+// Copyright (C) 2012 Chris Paulus <coding@cipher-naught.com>
+// Sponsored by David Eschelbacher, MD
+//
+// This program is free software; you can redistribute it and/or
+// modify it under the terms of the GNU General Public License
+// as published by the Free Software Foundation; either version 2
+// of the License, or (at your option) any later version.
+
+
 set_include_path(get_include_path() . PATH_SEPARATOR . dirname(__FILE__). '/../../../library/zend_framework_1.11/library');
 
 //Set OpenEMR includes
