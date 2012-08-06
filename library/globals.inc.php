@@ -203,6 +203,15 @@ $GLOBALS_METADATA = array(
       xl('Enables the old Charges panel for entering billing codes and payments. Not recommended, use the Fee Sheet instead.')
     ),
 
+  	//Work by Cipher-Naught 2012/08/05 to add Data Import functionallity.	
+  	'enable_Data_Import_in_left_menu' => array(
+      xl('Enable data import In Left Menu'),
+      'bool', // data type
+      '1', // default = true
+      xl('Enables data import In Left Menu.')
+    ),
+  		
+  		
     'online_support_link' => array(
       xl('Online Support Link'),
       'text',                           // data type

@@ -125,7 +125,7 @@ hr {
   border-style:solid;
   padding:25px 50px;
   margin-bottom:10px;
-  height:30%;
+  height:40%;
   
 }
 
@@ -139,9 +139,8 @@ hr {
 #upperContainer {
   margin:auto;
   width: 800px; 
-  background: #ffffff;
   border-width:10px;
-  height:400px;
+  height:600px;
 }
 #rightContainer {
   float:right;
@@ -158,9 +157,9 @@ hr {
   margin:auto;
   background-color: #EBEBEB;
   border-style:solid;
-  height:100%;
-  width:100%;
-  
+  height:91%;
+  width:70%;
+  padding:25px 50px;
 }
 
 
@@ -168,33 +167,34 @@ hr {
 #columnList {
   background:white;
   overflow:auto;
-  height:200px;
+  height:430px;
   
 }
 
 #bottomContainer {
   
-  width: 800px; 
+  width: 780px; 
   margin:auto;
   
   border-width:10px;
   height:600px;
+  display:table;
 }
 
 #importPreview { /* this is the bottom */
   margin-top:10px;
   margin-bottom:10px;
-  margin-left:10px;
-  margin-right:20px;
+  margin-left:40px;
+  margin-right:30px;
   padding:10px 10px;
   float:left;
-  width: 770px;
+  width: 754px;
   height:50%;
-   
+  display:table;
   background: #EBEBEB; 
   border-style:solid;
-  overflow:auto;
-  /*box-shadow: 10px 10px 5px #888888; can be added*/
+  overflow:visible;
+  
 }
 
 #buttonContainer {
@@ -208,18 +208,18 @@ hr {
 
 </style>
 </head>
-<body>
+<body class="body_top">
 <br/>
 <br/>
 <br/>
 <br/>
 <form method="<?php echo $form->getMethod() ?>" action="<?php echo $form->getAction()?>" enctype="<?php echo $form->getAttrib('enctype')?>">
 	<div id="buttonContainer">
-<span style="float:left;"><button type="button">Load Import Script</button></span>
 <span style="float:right;"><?php echo $form->getElement('processFile')->render(); ?></span> 
 
 <?php echo $form->getElement('hidTableData')->render(); ?>
 </div>
+<div style="margin:auto;width: 800px;">Message: <?php echo $form->lblOutput; ?><br/></div>
 
 <div id="upperContainer">
 	<div id="leftContainer">
@@ -228,11 +228,9 @@ hr {
 			<?php echo $form->getElement('dataFile')->render(); ?>
 			<?php echo $form->getElement('uploadFile')->render(); ?>
 			<?php echo $form->getElement('fileList')->render(); ?>
-			<?php echo $form->getElement('delete')->render(); ?>
-			<?php echo $form->getElement('apply')->render(); ?>
+			<?php echo $form->getElement('delete')->render(); ?><?php echo $form->getElement('apply')->render(); ?>
 			
 			<br/>
-			<a href="#" onClick="javascript:return ModifyPayments();"  class="css_button"><span><?php echo htmlspecialchars( xl('Modify Payments'), ENT_QUOTES);?></span></a>
 			</div>
 			<div id="options">
 			Basic Options<br/>
@@ -273,7 +271,7 @@ hr {
 				
 			</tr>
 			<tr>
-			<td>firstRowColumnHeading</td>
+			<td>First Row is Column Headings?</td>
 			<td><?php echo $form->getElement('firstRowColumnHeading')->render(); ?></td>
 			</tr>
 			</table>
@@ -292,12 +290,11 @@ hr {
 			
 			
 			<br/>
-			<input type="checkbox"/> Create Temp Table<br/>
 			List of Columns:
 			<div id="columnList" >
 			
 <?php 
-	echo $this->ArrayView()->makeAlternatingDiv($form->columnListSet,"yellow");
+	echo $this->ArrayView()->makeAlternatingDiv($form->columnListSet,"gray");
 	
 ?>
 			

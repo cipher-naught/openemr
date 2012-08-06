@@ -8,7 +8,7 @@ class Application_Form_Importer extends Zend_Form
 	public $previewTableStatus;
 	public $previewTableData;
 	public $previewTableStatusMessage;
-	
+	public $lblOutput;
 	
 		
 	/**
@@ -56,7 +56,11 @@ class Application_Form_Importer extends Zend_Form
     	);
     	return $localSelect;    	 
     }
-    
+    /**
+     * Creates the Row Limit Drop Down
+     * @param string $name name of select list to create
+     * @return Zend_Form_Element_Select
+     */
     public function createRowLimitList($name) {
     	$localSelect = new Zend_Form_Element_Select($name);
     	$this->clearDecorators($localSelect);
@@ -117,10 +121,16 @@ class Application_Form_Importer extends Zend_Form
     	$item->removeDecorator('Label');
     }
     
+    /**
+     * Creates File List select list with given name
+     * @param string $name
+     * @return Zend_Form_Element_Select
+     */
     public function createFileList($name) {
     	$localSelect = new Zend_Form_Element_Select($name);
     	//TODOCMP: Change to configured value
-    	$list = $this->getFileList("C:/dev/OpenEMR/Source/MyOpenEMR/desktopOpenemr/openemr/sites/default/uploadCache");
+    	$csvProcessor = new Application_Model_CsvFileImportMapper();
+    	$list = $this->getFileList($csvProcessor->getUploadLocation());
     	foreach($list as $value){
     		$localSelect->addMultiOption($value,$value);
     	} 
@@ -130,12 +140,13 @@ class Application_Form_Importer extends Zend_Form
     			
     			)
     	);
-    	
     	return $localSelect;
-    	
-    	
     }
-    
+    /**
+     * Get a list of files, but not directories for a given directory name.
+     * @param string $dirName
+     * @return array of file names:
+     */
     public function getFileList($dirName) {
     	
     	$returnList = array();
@@ -151,9 +162,11 @@ class Application_Form_Importer extends Zend_Form
     		}
     		closedir($handle);
     	}
-    	
     	return $returnList;
     }
+    /**
+     * Initialization of the Importer.
+     */
     public function init()
     {
         /* Form Elements & Other Definitions Here ... */
@@ -180,11 +193,13 @@ class Application_Form_Importer extends Zend_Form
     	$fileUpload = new Zend_Form_Element_Submit('uploadFile');
     	$fileUpload->setLabel("Upload File");
     	
+    	$this->clearDecorators($fileUpload);
     	$this->addElement($fileUpload,'uploadFile');
     	
     	$fileApply = new Zend_Form_Element_Submit('apply');
     	$fileApply->setLabel("Apply");
-    	 
+    	$this->clearDecorators($fileApply);
+    	$fileApply->removeDecorator('DtDdWrapper');
     	$this->addElement($fileApply,'apply');
 
     	
@@ -193,15 +208,19 @@ class Application_Form_Importer extends Zend_Form
     			"onclick" => "return ConfirmFileDelete(this)"
     			)
     	);
+    	$this->clearDecorators($fileDelete);
+    	$fileDelete->removeDecorator('DtDdWrapper');
     	$fileDelete->setLabel("delete");
     	
-    	$this->addElement($fileDelete,'delete');
+    	$this->addElement($fileDelete,'Delete');
     	
     	$fileProcess = new Zend_Form_Element_Submit('processFile');
     	$fileProcess->setLabel("Process File");
+    	$this->clearDecorators($fileProcess);
     	
     	$fileProcess->setAttribs(array(
-    			"onclick" => "return ConfirmFileProcess(this)"
+    			"onclick" => "return ConfirmFileProcess(this)",
+    			"disable" => true
     	)
     	);
     	
@@ -253,6 +272,8 @@ class Application_Form_Importer extends Zend_Form
     	$this->addElement($this->createFileList("fileList"), "fileList");
     	
     	$this->addElement($this->createRowLimitList('rowLimitList'),'rowLimitList');
+    	
+    	$this->lblOutput = "Please select a file to process.";
     	
     }
 

@@ -7,38 +7,20 @@ class Application_Model_DbMapper
 	protected $_db_table = "";
 	protected $_db;
 
-
+	/**
+	 * Constructor
+	 */
 	public function __construct()
 	{
-		//Instantiate the Table Data Gateway for the User table
-		//$this->_db_tables = "";
-		//$db = Zend_Db_Table::getDefaultAdapter();
-
-		//$params = array('host' => 'localhost:3306', 'username' => 'root',
 
 		$this->_db = $GLOBALS['adodb']['db'];
 
-		//$this->_db->
-		//$stmt =  $GLOBALS['adodb']['db']->Execute('SHOW TABLES');
-		$resultSet =  $this->_db->Execute('SHOW TABLES');
-		//if (is_array($stmt)) {
-
-		if (is_object($resultSet)) {
-			while($rowValue = $resultSet->FetchRow()) {
-				//TODOCMP: Check fetch row type
-
-				foreach ($rowValue as $key => $value) {
-					$this->_db_tables[] = $value;
-				}
-				//$this->_db_tables[] = $value[1];
-			}
-			//while ($row = $resultSet->FetchRow()) {
-			//$lcl = $row[0];
-			//$this->_db_tables[] = $row[0];
-			//}
-		}
-
 	}
+	/**
+	 * Generic Getter method
+	 * @param string $name of values trying to get
+	 * @throws Exception
+	 */
 	public function __get($name)
 	{
 		$method = '__get' . $name;
@@ -48,7 +30,11 @@ class Application_Model_DbMapper
 		return $this->$method();
 
 	}
-	
+	/**
+	 * Generic Setter method
+	 * @param string $name of values trying to set
+	 * @throws Exception
+	 */
 	public function __set($name, $value)
 	{
 		$method = 'set' . $name;
@@ -57,27 +43,36 @@ class Application_Model_DbMapper
 		}
 		$this->$method($value);
 	}
+	
+	/**
+	 * returns an array of table names
+	 * @returns array of table names
+	 */
 	public function __getTables()
 	{
+		$resultSet =  $this->_db->Execute('SHOW TABLES');
+		
+		if (is_object($resultSet)) {
+			while($rowValue = $resultSet->FetchRow()) {
+		
+		
+				foreach ($rowValue as $key => $value) {
+					$this->_db_tables[] = $value;
+				}
+			}
+		}
 		return $this->_db_tables;
 
 	}
 
-	public function __setStuff($value)
-	{
-		$this->_db_table = "";
-	}
-	public function __getStuff()
-	{
-		//return $this->_db_table;
-		return "asdfasdf";
-	}
-
-	//TODOCmp: Probably can't pass a value into a get.
+	/**
+	 * Gets a list of columns for a given table
+	 * @param string $table
+	 * @throws Exception if table not found.
+	 * @return multitype: Array of column names, false if it fails.
+	 */
 	public function columnList($table)
 	{
-		//DESCRIBE business;
-
 		$resultSet =  $this->_db->Execute('DESCRIBE '.$table);
 		$outputArray = array();
 
@@ -85,48 +80,21 @@ class Application_Model_DbMapper
 				
 			while($rowValue = $resultSet->FetchRow()) {
 				//TODOCMP: Check fetch row type
-
-
 				foreach ($rowValue as $key => $value) {
 					//$outputArray[] = $value;
 					array_push($outputArray, $value);
 					break;
 				}
-
-
-				//$this->_db_tables[] = $value[1];
 			}
-			//while ($row = $resultSet->FetchRow()) {
-			//$lcl = $row[0];
-			//$this->_db_tables[] = $row[0];
-			//}
 		}
-
-
-		//$stmt =  $db->query('DESCRIBE '.$table);
-		//
-		//$stmt->setFetchMode(Zend_Db::FETCH_NUM);
-		//$rows = $stmt->fetchAll();
-		//
-		////$outputArray = NULL;
-		//$outputArray = array();
-		//foreach($rows as $data) {
-		//	$lclVal = $data[0];
-		//	array_push($outputArray, $lclVal);
-		//}
 		if(isset($outputArray)) {
 			return $outputArray;
 		}
 		else
 		{
-			//TODO: Raise Error
 			throw new Exception('DBMapper Problem, table not found');
-			return "bad";
+			return false; //not executed, included for all return paths to return value. 
 		}
-
-			
 	}
-
-
 }
 

@@ -4,6 +4,13 @@ class Zend_Helper_TableViewHelper extends Zend_View_Helper_Abstract
 	public function tableViewHelper() {
 		return $this;
 	}
+	/**
+	 * Generate HTML table from data specified.
+	 * @param array $tableData
+	 * @param array $listOfColumns
+	 * @param arry $columnChoice 
+	 * @return string HTML table
+	 */
 	public function generateTable($tableData, $listOfColumns, $columnChoice = NULL) {
 	
 		$output =  "<table border=\"1\"><tr>";
@@ -34,7 +41,13 @@ class Zend_Helper_TableViewHelper extends Zend_View_Helper_Abstract
 		$output .= "</table>";
 		return $output;
 	}
-	
+	/**
+	 * Generates the select list for display at top of columns
+	 * @param array $fieldArray
+	 * @param int $nameID number to be attended to "name_"
+	 * @param string $headerValue deafult value
+	 * @return string Zend Element Select rendered
+	 */
 	public function generateSelectList($fieldArray, $nameID, $headerValue = NULL) {
 	
 		$category = new Zend_Form_Element_Select('column');

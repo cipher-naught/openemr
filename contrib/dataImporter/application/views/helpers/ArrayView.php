@@ -59,22 +59,22 @@ class Zend_Helper_ArrayView extends Zend_View_Helper_Abstract
 				$i++;
 			}
 		}
-		else {
-			//stuff
-			//TODOCMP: Raise error
-		}
-		
 		return $lcl;
 	}
-	
+	/**
+	 * Generates an div with values in alternating colors.
+	 * @param array $arrayOfItems array of items to list
+	 * @param string $altColor color to alternate to
+	 * @return string
+	 */
 	public function makeAlternatingDiv($arrayOfItems, $altColor) {
 		$lcl = "";
 		for($i = 0; $i < count($arrayOfItems); $i++) {
 			if($i % 2 != 0) {
-				$lcl .= "<div style=\"background-color:".$altColor.";\">".$arrayOfItems[$i]. "</div>";
+				$lcl .= "<div style=\"background-color:".$altColor.";\">".$arrayOfItems[$i]. "</div>\n";
 			}
 			else {
-				$lcl .= "<div style=\"background-color:white;\">".$arrayOfItems[$i]. "</div>";
+				$lcl .= "<div style=\"background-color:white;\">".$arrayOfItems[$i]. "</div>\n";
 			}
 		}
 		return $lcl;			

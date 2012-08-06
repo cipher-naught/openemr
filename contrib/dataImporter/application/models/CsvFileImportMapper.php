@@ -4,15 +4,15 @@ require_once (dirname(__FILE__) ."/../../../../library/sql.inc");
 
 class Application_Model_CsvFileImportMapper
 {
-	
-	
-	private $returnSQL = false; //Should the SQL be run directly or stored as an array.
 	private $uploadLocation = "" ;
 	protected $systemLocale;
 	
-	//"C:/dev/OpenEMR/Source/MyOpenEMR/desktopOpenemr/openemr/sites/default/documents/";
 	private $_listOfColumns; //Columns of the table
 	
+	/**
+	 * Constructor
+	 * @throws Exception
+	 */
 	public function __construct() {
 		if(empty($this->uploadLocation)) {
 			$this->uploadLocation = $GLOBALS['OE_SITE_DIR'] . "/uploadCache";
@@ -27,22 +27,39 @@ class Application_Model_CsvFileImportMapper
 			}
 		}
 	}
+	/**
+	 * Gets Upload location (folder/directory)
+	 * @return string
+	 */
 	public function getUploadLocation() {
+		
 		return $this->uploadLocation;
 		
 	}	
 	
-	public function uploadLocationFromFile($fileName) {
-		return $this->uploadLocation."/".$fileName;
-	}
-	//Add getters and setters
-	//public function
 	/**
-	 * Used to move temporary file to a more permanent location. 
-	 * @param string $fileNameFull complete path of the orginal file
-	 * @param unknown_type $fileName basic name of the file
-	 * @param string $randVal value to prepend to file being created.
-	 * @return string full path to the file being created
+	 * Gets the full path for a file name and checks for directory transversal.
+	 * @param string $fileName file name portion of the file 
+	 * @return boolean|string returns false for security exception 
+	 */
+	public function uploadLocationFromFile($fileName) {
+		if (strpos($fileName, '../') !== false || strpos($fileName, "..\\") !== false || strpos($fileName, '/..') !== false || strpos($fileName, '\..') !== false)
+		{
+			//security exception.
+			return false;
+			
+		}
+		else
+		{
+			return $this->uploadLocation."/".$fileName;
+		}
+	}
+	/**
+	 * Returns a file pointer to either the file specified if UTF8, or re-encodes the file as UTF8 and a pointer to that file.
+	 * Note: Orginal file is not changed. 
+	 * @param string $fileNameFull
+	 * @param string $txtEncoding
+	 * @return filepointer
 	 */
 	public function moveTempAndEncode($fileNameFull, $txtEncoding) {
 		
@@ -51,15 +68,26 @@ class Application_Model_CsvFileImportMapper
 			return $this->convertEncoding($fileNameFull, tmpfile(),$txtEncoding );
 		}
 		else { 
-			return open($fileNameFull,"r") or die();
+			return open($fileNameFull,"r") or die("Unable to open file in CsvFileImportMapper.php");
 		}
 	}
-	
+	/**
+	 * Moves the temporary file
+	 * @param string $tmpName Orginal file
+	 * @param string $newFileName New filename (without path)
+	 */
 	public function moveTemp($tmpName, $newFileName) {
 		
 		move_uploaded_file($tmpName,  $this->uploadLocation ."/".$newFileName);
 	}
 	
+	/**
+	 * Converts the file to a temporary location and return a file pointer to it.
+	 * @param string $fromFile
+	 * @param string $toFile
+	 * @param string $txtEncoding
+	 * @return filepointer
+	 */
 	public function convertEncoding($fromFile, $toFile, $txtEncoding) {
 		$buf = mb_convert_encoding(file_get_contents($fromFile), "utf8", $txtEncoding);
 		
@@ -68,7 +96,16 @@ class Application_Model_CsvFileImportMapper
 		return $toFile;
 	}
 
-	
+	/**
+	 * Generates an array(s) of data specified in the file.
+	 * @param filepointer $fileNamePointer
+	 * @param string $tableName
+	 * @param string $fieldDelimiter single character
+	 * @param string $txtQualifier single character
+	 * @param boolean $firstRowColumnNames
+	 * @param int $numberOfRows
+	 * @return multitype:multitype: either a single array if no columns specified, or 2 arrays if columns are specified
+	 */
 	public function generateTableArray($fileNamePointer, $tableName, $fieldDelimiter, $txtQualifier, $firstRowColumnNames = false, $numberOfRows =NULL) {
 		$output = array();
 			
@@ -88,7 +125,7 @@ class Application_Model_CsvFileImportMapper
 				if($rowCount>$numberOfRows) {
 					break;
 				}
-				if(($buffer = fgetcsv($fileNamePointer, 4096, $fieldDelimiter)) !== false) {
+				if(($buffer = fgetcsv($fileNamePointer, 4096, $fieldDelimiter, $txtQualifier)) !== false) {
 					
 					//TODOCMP: fix
 					//if($txtEncoding != "UTF-8") {
@@ -138,65 +175,65 @@ class Application_Model_CsvFileImportMapper
 	}
 	
 	/**
-	 * 
-	 * @param string $fileName Full path location of file to be parsed
-	 * @param string $tableName Table to be inserted into
-	 * @param array $columnRules array of columns orders to be used 
-	 * @param string $txtEncoding encoding of file
+	 * Process the import of the file given the following parameters.
+	 * @param filepointer $filePointer
+	 * @param string $tableName
+	 * @param array $columnRules
+	 * @param string $txtEncoding
 	 * @param string $fieldDelimit
 	 * @param string $txtQualifier
-	 * @param bool $firstRowIsColumnHeaders boolean of whether the first row is column names, if true then skip first row.
-	 * @return string_array an array of SQL insert statements
+	 * @param boolean $firstRowIsColumnHeaders
+	 * @return boolean success or failure
 	 */
-	public function importFile($fileName, $tableName, $columnRules,$txtEncoding, $fieldDelimit, $txtQualifier, $firstRowIsColumnHeaders) {
+	public function importFile($filePointer, $tableName, $columnRules,$txtEncoding, $fieldDelimit, $txtQualifier, $firstRowIsColumnHeaders) {
+				
 		
-		
-
-		
-		
-		
-		$fp = fopen($fileName, "r") or die("Unable to read uploaded file."); //Add die erorr
 		
 		$_db = $GLOBALS['adodb']['db'];
 		$_db->StartTrans();
 		$counter = 0; // to omission first row if it is table headers, 0 => Skip first row
+		$success = false;
 		
-		while(($buffer = fgets($fp)) !== false) {
-			if($txtEncoding != "UTF-8") {
-				$buffer = mb_convert_encoding($buffer, "UTF8",$txtEncoding);
-			}
-			//Some times csv files do not include text qualifiers like they should
-			//We automatically insert them if they are missing.
-			//if(!strpos($buffer,$txtQualifier) ) { 
-			//	$buffer = str_replace(",","\",\"",$buffer);
-			//	$buffer = "\"$buffer\"";
-			//}
-			//If we fail to get a line, then just skip it.
-			if( !$line = str_getcsv($buffer, $fieldDelimit, $txtQualifier) 
-					&& ($counter ==0 && $firstRowIsColumnHeaders)) { //skip first row if it contains column information.
-				continue;
-			}
-			$columns = NULL;
-			$values = NULL;
-			$rowcount = 0;
-			$outputLine1 = "insert into $tableName (";
-			$outputLine2 = "\nValues (";
-			for($c =0; $c< count($line); $c++) {
-				// For example insert in 3 column (e.g. id, name, email )
-				 
-				//$columns = array_push($columns, $key);
-				if($columnRules[$c] != NULL) {
-					//$values = array_push($values, $value);
-					$outputLine1 .= mysqli_real_escape_string($columnRules[$c]) .", ";
-					$outputLine2 .= "\"".mysqli_real_escape_string($line[$c]) ."\", ";
+		while(!feof($filePointer)){
+			if(($buffer = fgetcsv($filePointer, 4096, $fieldDelimit, $txtQualifier)) !== false) {
+				//Need to include skip for first line.
+			
+				$columns = NULL;
+				$values = NULL;
+				
+				$outputLine1 = "insert into $tableName (";
+				$outputLine2 = "\nValues (";
+				$dataInserted = false;
+				for($c =0; $c< count($buffer); $c++) {
+					// For example insert in 3 column (e.g. id, name, email )
+					 
+					//$columns = array_push($columns, $key);
+					if($counter == 0 && $firstRowIsColumnHeaders)  {
+						//Skip first row.
+						continue;
+					}
+					if($columnRules[$c] != NULL) {
+						//$values = array_push($values, $value);
+						$dataInserted = true;
+						$outputLine1 .=  ($columnRules[$c]) .", ";
+						$outputLine2 .= "\"".($buffer[$c]) ."\", ";
+					}
+					
 				}
+				//Character clean up and add to system
+				if($dataInserted) {			
+					$success = $_db->Execute(rtrim($outputLine1,", "). ")".rtrim($outputLine2,", ").");\n\n");
+					if(!$success) {
+						$_db->FailTrans();
+						break;
+					}
+				}
+				$counter++;
 			}
-			//Character clean up and add to system			
-			$_db->sqlInsert(rtrim($outputLine1,", "). ")".rtrim($outputLine2,", ").");\n\n");
-			$counter++;
 		}
-		fclose($fp);
+		fclose($filePointer);
 		return $_db->CompleteTrans();
+		
 	}
 }
 
