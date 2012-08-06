@@ -8,7 +8,6 @@
 
 // This report shows upcoming appointments with filtering and
 // sorting by patient, practitioner, appointment type, and date.
-// 2012-01-01 - Added display of home and cell phone and fixed header
 
 require_once("../globals.php");
 require_once("../../library/patient.inc");
@@ -54,7 +53,7 @@ $form_orderby = getComparisonOrder( $_REQUEST['form_orderby'] ) ?  $_REQUEST['fo
 <script type="text/javascript" src="../../library/dialog.js"></script>
 <script type="text/javascript" src="../../library/js/jquery.1.3.2.js"></script>
 
-<script type="text/javascript">
+<script LANGUAGE="JavaScript">
 
  var mypcc = '<?php echo $GLOBALS['phone_country_code'] ?>';
 
@@ -113,13 +112,16 @@ $form_orderby = getComparisonOrder( $_REQUEST['form_orderby'] ) ?  $_REQUEST['fo
 <div id="report_parameters_daterange"><?php echo date("d F Y", strtotime($form_from_date)) ." &nbsp; to &nbsp; ". date("d F Y", strtotime($form_to_date)); ?>
 </div>
 
-<form method='post' name='theform' id='theform' action='appointments_report.php'>
+<form method='post' name='theform' id='theform'
+	action='appointments_report.php'>
+<form name='theform' id='theform' method='post'
+	action='referrals_report.php'>
 
 <div id="report_parameters">
 
 <table>
 	<tr>
-		<td width='650px'>
+		<td width='550px'>
 		<div style='float: left'>
 
 		<table class='text'>
@@ -183,18 +185,13 @@ $form_orderby = getComparisonOrder( $_REQUEST['form_orderby'] ) ?  $_REQUEST['fo
 		<table style='border-left: 1px solid; width: 100%; height: 100%'>
 			<tr>
 				<td>
-				<div style='margin-left: 15px'>
-                                <a href='#' class='css_button' onclick='$("#form_refresh").attr("value","true"); $("#theform").submit();'>
-				<span> <?php xl('Submit','e'); ?> </span> </a> 
-                                <?php if ($_POST['form_refresh'] || $_POST['form_orderby'] ) { ?>
-				<a href='#' class='css_button' onclick='window.print()'> 
-                                    <span> <?php xl('Print','e'); ?> </span> </a> 
-                                <a href='#' class='css_button' onclick='window.open("../patient_file/printed_fee_sheet.php?fill=2","_blank")'> 
-                                    <span> <?php xl('Superbills','e'); ?> </span> </a> 
-                                <?php } ?></div>
+				<div style='margin-left: 15px'><a href='#' class='css_button'
+					onclick='$("#form_refresh").attr("value","true"); $("#theform").submit();'>
+				<span> <?php xl('Submit','e'); ?> </span> </a> <?php if ($_POST['form_refresh'] || $_POST['form_orderby'] ) { ?>
+				<a href='#' class='css_button' onclick='window.print()'> <span> <?php xl('Print','e'); ?>
+				</span> </a> <?php } ?></div>
 				</td>
 			</tr>
-                        <tr>&nbsp;&nbsp;<?php xl('Most column headers can be clicked to change sort order','e') ?></tr>
 		</table>
 		</td>
 	</tr>
@@ -228,10 +225,6 @@ if ($_POST['form_refresh'] || $_POST['form_orderby']) {
 	<?php if ($form_orderby == "pubpid") echo " style=\"color:#00cc00\"" ?>><?php  xl('ID','e'); ?></a>
 		</th>
 
-         	<th><?php xl('Home','e'); //Sorting by phone# not really useful ?></th>
-
-                <th><?php xl('Cell','e'); //Sorting by phone# not really useful ?></th>
-                
 		<th><a href="nojs.php" onclick="return dosort('type')"
 	<?php if ($form_orderby == "type") echo " style=\"color:#00cc00\"" ?>><?php  xl('Type','e'); ?></a>
 		</th>
@@ -254,14 +247,12 @@ if ($_POST['form_refresh'] || $_POST['form_orderby']) {
 	}
 
 	$appointments = sortAppointments( $appointments, $form_orderby );
-        $pid_list = array();  // Initialize list of PIDs for Superbill option
-        
+
 	foreach ( $appointments as $appointment ) {
-                array_push($pid_list,$appointment['pid']);
 		$patient_id = $appointment['pid'];
 		$docname  = $appointment['ulname'] . ', ' . $appointment['ufname'] . ' ' . $appointment['umname'];
-                
-                $errmsg  = "";
+		$errmsg  = "";
+
 
 		?>
 
@@ -280,10 +271,6 @@ if ($_POST['form_refresh'] || $_POST['form_orderby']) {
 
 		<td class="detail">&nbsp;<?php echo $appointment['pubpid'] ?></td>
 
-                <td class="detail">&nbsp;<?php echo $appointment['phone_home'] ?></td>
-
-                <td class="detail">&nbsp;<?php echo $appointment['phone_cell'] ?></td>
-
 		<td class="detail">&nbsp;<?php echo xl_appt_category($appointment['pc_catname']) ?>
 		</td>
 
@@ -294,8 +281,7 @@ if ($_POST['form_refresh'] || $_POST['form_orderby']) {
 	<?php
 	$lastdocname = $docname;
 	}
-	// assign the session key with the $pid_list array - note array might be empty -- handle on the printed_fee_sheet.php page.
-        $_SESSION['pidList'] = $pid_list;
+	
 	?>
 	</tbody>
 </table>
@@ -308,7 +294,7 @@ if ($_POST['form_refresh'] || $_POST['form_orderby']) {
 	name="patient" value="<?php echo $patient ?>" /> <input type='hidden'
 	name='form_refresh' id='form_refresh' value='' /></form>
 
-<script type="text/javascript">
+<script>
 
 <?php
 if ($alertmsg) { echo " alert('$alertmsg');\n"; }
@@ -320,13 +306,13 @@ if ($alertmsg) { echo " alert('$alertmsg');\n"; }
 
 <!-- stuff for the popup calendar -->
 <style type="text/css">
-    @import url(../../library/dynarch_calendar.css);
+@import url(../../library/dynarch_calendar.css);
 </style>
 <script type="text/javascript" src="../../library/dynarch_calendar.js"></script>
 <?php include_once("{$GLOBALS['srcdir']}/dynarch_calendar_en.inc.php"); ?>
 <script type="text/javascript"
 	src="../../library/dynarch_calendar_setup.js"></script>
-<script type="text/javascript">
+<script language="Javascript">
  Calendar.setup({inputField:"form_from_date", ifFormat:"%Y-%m-%d", button:"img_from_date"});
  Calendar.setup({inputField:"form_to_date", ifFormat:"%Y-%m-%d", button:"img_to_date"});
 </script>

@@ -2,43 +2,10 @@
 
 include_once(dirname(__FILE__) . "/sqlconf.php");
 require_once(dirname(__FILE__) . "/adodb/adodb.inc.php");
-require_once(dirname(__FILE__) . "/adodb/drivers/adodb-mysql.inc.php");
-
 include_once(dirname(__FILE__) . "/log.inc");
 
-class ADODB_mysql_log extends ADODB_mysql
-{
-    	function Execute($sql,$inputarr=false)
-        {
-            $retval= parent::Execute($sql,$inputarr);
-            // Kevin Yeh(kevin.y@integralemr.com)
-            // Stash the insert ID into lastidado so it doesn't get clobbered when 
-            // we insert into the audit log
-            $GLOBALS['lastidado']=$this->Insert_ID();
-            $outcome= ($retval === false) ? false : true;
-            auditSQLEvent($sql,$outcome,$inputarr);
-            return $retval;
-        }
-
-        // Kevin Yeh(kevin.y@integralemr.com)
-        // Need to override this method to prevent infinite recursion with execute
-        // when trying to retrieve the last insert id.
-        function _insertid()
-        {
-            $rs=$this->ExecuteNoLog("SELECT LAST_INSERT_ID()");
-            $ret=reset($rs->fields);
-            $rs->close();
-            return $ret;
-        }
-
-        function ExecuteNoLog($sql,$inputarr=false)
-        {
-            return parent::Execute($sql,$inputarr);
-        }
-}
 if (!defined('ADODB_FETCH_ASSOC')) define('ADODB_FETCH_ASSOC', 2);
-$database = NewADOConnection("mysql_log"); // Use the subclassed driver which logs execute events
-
+$database = NewADOConnection("mysql");
 $database->PConnect($host, $login, $pass, $dbase);
 $GLOBALS['adodb']['db'] = $database;
 $GLOBALS['dbh'] = $database->_connectionID;
@@ -67,7 +34,6 @@ if (!$GLOBALS['dbh']) {
   exit;
 }//if no connection
 
-
 // Function that will allow use of the adodb binding
 //   feature to prevent sql-injection. Will continue to
 //   be compatible with previous function calls that do
@@ -93,34 +59,10 @@ function sqlStatement($statement, $binds=NULL )
     // Use mysql_query and return a resource.
     $resource = mysql_query($statement, $GLOBALS['dbh']);
     if ($resource === FALSE) {
-      auditSQLEvent($statement, FALSE, $binds);
+      auditSQLEvent($statement, FALSE);
       HelpfulDie("query failed: $statement", mysql_error($GLOBALS['dbh']));
     }
-    auditSQLEvent($statement, TRUE, $binds);
-    return $resource;
-  }
-}
-
-// Function that is the equivalent of the above
-//   sqlStatement() function, EXCEPT it skips the
-//   audit engine. This function should only be used
-//   in very special situations.
-function sqlStatementNoLog($statement, $binds=NULL )
-{
-  if (is_array($binds)) {
-    // Use adodb ExecuteNoLog with binding and return a recordset.
-    $recordset = $GLOBALS['adodb']['db']->ExecuteNoLog( $statement, $binds );
-    if ($recordset === FALSE) {
-      HelpfulDie("query failed: $statement", $GLOBALS['adodb']['db']->ErrorMsg());
-    }
-    return $recordset;
-  }
-  else {
-    // Use mysql_query and return a resource.
-    $resource = mysql_query($statement, $GLOBALS['dbh']);
-    if ($resource === FALSE) {
-      HelpfulDie("query failed: $statement", mysql_error($GLOBALS['dbh']));
-    }
+    auditSQLEvent($statement, TRUE);
     return $resource;
   }
 }
@@ -207,7 +149,7 @@ function sqlQuery($statement, $status_or_binds=FALSE)
     // run mysql_query to bypass the audit engine if error
     //   in query.
     $resource = mysql_query($statement, $GLOBALS['dbh']);
-    auditSQLEvent($statement, TRUE, $status_or_binds);
+    auditSQLEvent($statement, TRUE);
    //$rez = @mysql_fetch_array($query, MYSQL_ASSOC);
     $rez = @mysql_fetch_array($resource, MYSQL_ASSOC); //Replace $query with $resource to calculate correct checksum
     if ($rez == FALSE)
@@ -217,15 +159,32 @@ function sqlQuery($statement, $status_or_binds=FALSE)
 }
 
 // ViSolve: Create a seperate function for audit log calls.
-/* Kevin Yeh (kevin.y@integralemr.com) 12/13/2011
- * This allows us to insert a row in the log table that doesn't log its own actions.
- */
+// The audit calls are handled through separate function.
+// Before the audit calls are executed, the mysql_insert_id() is stored in GLOBALS['lastiddao']
+//  and used in the relevant places, i.e in the mysql adodb driver files..
+// Note:  This GLOBAL variable gets its value only when the audit is enabled.
 function sqlInsertClean_audit($statement)
 {
+  // Get the mysql_insert_id() before the execution of the log statement
+ //$lastid=mysql_insert_id($GLOBALS['dbh']);
+ //$GLOBALS['lastidado']=$lastid;
+// when audit is enabled and $GLOBALS['lastidado'] is not set, then set the GLOBALS irrespective of dbh and adodb handlers.
 
-  $ret = $GLOBALS['adodb']['db']->ExecuteNoLog($statement);
+// ViCarePlus :: Fix for Audit logging Issue :: Sep 24,2010 .
+// Issue:: The LAST_INSERT_ID of the audit log table overrides the value in the $GLOBALS['lastidado'] variable. 
+//         In a single transaction, when more than one query is being executed, this issue happens. 
+// Fix: This code has been taken care by the function auditSQLEvent() in log.inc file
+//  if ($GLOBALS['lastidado'] > 0)
+//	{ /* do nothing */ }
+//        else {
+//                 $lastid=mysql_insert_id($GLOBALS['dbh']);
+//                 $GLOBALS['lastidado']=$lastid;
+//        }
+
+  //----------run a mysql insert, return the last id generated
+  $ret = mysql_query($statement, $GLOBALS['dbh']);
   if ($ret === FALSE) {
-    HelpfulDie("insert failed: $statement", $GLOBALS['adodb']['db']->ErrorMsg());
+    HelpfulDie("insert failed: $statement", mysql_error($GLOBALS['dbh']));
   }
 }
 
@@ -360,6 +319,9 @@ function get_db() {
   return $GLOBALS['adodb']['db'];
 }
 
-
+// DEPRECATED FUNCTION
+function sqlLastID() {
+  return mysql_insert_id($GLOBALS['dbh']);
+}
 
 ?>

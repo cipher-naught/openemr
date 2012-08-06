@@ -15,59 +15,6 @@ function getPnoteById($id, $cols = "*")
     "order by date DESC limit 0,1", array($id) );
 }
 
-
-// activity can be 0, 1, or 'all'
-function getPnotesByUser($activity="1",$show_all="no",$user='',$count=false,$sortby='',$sortorder='',$begin='',$listnumber='')
-{
-
-  // Set the activity part of query
-  if ($activity=='1') {
-    $activity_query = " pnotes.message_status != 'Done' AND pnotes.activity = 1 AND ";
-  }
-  else if ($activity=='0') {
-    $activity_query = " (pnotes.message_status = 'Done' OR pnotes.activity = 0) AND ";
-  }
-  else { //$activity=='all'
-    $activity_query = " ";
-  }
-
-  // Set whether to show chosen user or all users
-  if ($show_all == 'yes' ) {
-    $usrvar='_%';
-  } else {
-    $usrvar=$user;
-  } 
-
-  // run the query
-  $sql = "SELECT pnotes.id, pnotes.user, pnotes.pid, pnotes.title, pnotes.date, pnotes.message_status,
-          IF(pnotes.user != pnotes.pid,users.fname,patient_data.fname) as users_fname,
-          IF(pnotes.user != pnotes.pid,users.lname,patient_data.lname) as users_lname,
-          patient_data.fname as patient_data_fname, patient_data.lname as patient_data_lname
-          FROM ((pnotes LEFT JOIN users ON pnotes.user = users.username)
-          JOIN patient_data ON pnotes.pid = patient_data.pid) WHERE $activity_query
-          pnotes.deleted != '1' AND pnotes.assigned_to LIKE ?";
-  if (!empty($sortby) || !empty($sortorder)  || !empty($begin) || !empty($listnumber)) {
-    $sql .= " order by ".add_escape_custom($sortby)." ".add_escape_custom($sortorder).
-           " limit ".add_escape_custom($begin).", ".add_escape_custom($listnumber);
-  }
-  $result = sqlStatement($sql, array($usrvar));
-
-  // return the results
-  if ($count) {
-    if(sqlNumRows($result) != 0) {
-        $total = sqlNumRows($result);
-    }
-    else {
-        $total = 0;
-    }
-    return $total;
-  }
-  else {
-    return $result;
-  }
-}
-
-
 function getPnotesByDate($date, $activity = "1", $cols = "*", $pid = "%",
   $limit = "all", $start = 0, $username = '', $docid = 0, $status = "")
 {
@@ -85,14 +32,8 @@ $sqlParameterArray = array();
   }
   $sql .= " AND deleted != 1"; // exclude ALL deleted notes
   if ($activity != "all") {
-    if ($activity == '0') {
-      // only return inactive
-      $sql .= " AND (activity = '0' OR message_status = 'Done') ";
-    }
-    else { // $activity == '1'
-      // only return active
-      $sql .= " AND activity = '1' AND message_status != 'Done' ";
-    }
+    $sql .= " AND activity = ?";
+    array_push($sqlParameterArray, $activity);
   }
   if ($username) {
     $sql .= " AND assigned_to LIKE ?";
@@ -112,7 +53,6 @@ $sqlParameterArray = array();
   return $all;
 }
 
-// activity can only be 0, 1, or 'all
 function getSentPnotesByDate($date, $activity = "1", $cols = "*", $pid = "%",
   $limit = "all", $start = 0, $username = '', $docid = 0, $status = "")
 {
@@ -130,14 +70,8 @@ $sqlParameterArray = array();
   }
   $sql .= " AND deleted != 1"; // exclude ALL deleted notes
   if ($activity != "all") {
-    if ($activity == '0') {
-      // only return inactive
-      $sql .= " AND (activity = '0' OR message_status = 'Done') ";
-    }
-    else { // $activity == '1'
-      // only return active
-      $sql .= " AND activity = '1' AND message_status != 'Done' ";
-    }
+    $sql .= " AND activity = ?";
+    array_push($sqlParameterArray, $activity);
   }
   if ($username) {
     $sql .= " AND assigned_to LIKE ?";
@@ -217,7 +151,6 @@ function getPatientNotifications($pid = '', $limit = '', $offset = 0, $search = 
         AND lo2.list_id = 'rule_action' 
     WHERE pid = ?
       AND active = 1
-      AND message_status != 'Done'
       AND date_created > DATE_SUB(NOW(), INTERVAL 1 MONTH)
       $search
     ORDER BY `date` desc
@@ -267,31 +200,12 @@ function getPatientSentNotes($pid = '', $limit = '', $offset = 0, $search = '')
   return $all;
 }
 
-// activity can be 0, 1, or 'all'
 function getPnotesByPid ($pid, $activity = "1", $cols = "*", $limit=10, $start=0)
 {
- if ($activity == '1') {
-  // return only active
-  $res = sqlStatement("SELECT $cols FROM pnotes WHERE pid LIKE ? " .
-    "AND activity = '1' ".
-    " AND message_status != 'Done' ".
+  $res = sqlStatement("SELECT $cols FROM pnotes WHERE pid LIKE '$pid' " .
+    "AND activity = '$activity' ".
     " AND deleted != 1 ".
-    " ORDER BY date DESC LIMIT $start,$limit", array($pid) );
- }
- else if ($activity == '0') {
-  // return only inactive
-  $res = sqlStatement("SELECT $cols FROM pnotes WHERE pid LIKE ? " .
-    "AND (activity = '0' ".
-    " OR message_status = 'Done') ".
-    " AND deleted != 1 ".
-    " ORDER BY date DESC LIMIT $start,$limit", array($pid) );
- }
- else { // $activity == "all"
-  // return both active and inactive
-  $res = sqlStatement("SELECT $cols FROM pnotes WHERE pid LIKE ? " .
-    " AND deleted != 1 ".
-    " ORDER BY date DESC LIMIT $start,$limit", array($pid) );
- }
+    " ORDER BY date DESC LIMIT $start,$limit");
   for ($iter = 0; $row = sqlFetchArray($res); $iter++)
     $all[$iter] = $row;
   return $all;
@@ -301,9 +215,6 @@ function addPnote($pid, $newtext, $authorized = '0', $activity = '1',
   $title='Unassigned', $assigned_to = '', $datetime = '', $message_status = "New")
 {
   if (empty($datetime)) $datetime = date('Y-m-d H:i:s');
-
-  // make inactive if set as Done
-  if ($message_status == "Done") $activity = 0;
 
   $body = date('Y-m-d H:i') . ' (' . $_SESSION['authUser'];
   if ($assigned_to) $body .= " to $assigned_to";
@@ -319,9 +230,6 @@ function addMailboxPnote($pid, $newtext, $authorized = '0', $activity = '1',
 {
   if (empty($datetime)) $datetime = date('Y-m-d H:i:s');
 
-  // make inactive if set as Done
-  if ($message_status == "Done") $activity = 0;
-
   $body = date('Y-m-d H:i') . ' (' . $pid;
   if ($assigned_to) $body .= " to $assigned_to";
   $body = $body . ') ' . $newtext;
@@ -336,9 +244,6 @@ function updatePnote($id, $newtext, $title, $assigned_to, $message_status = "")
   $row = getPnoteById($id);
   if (! $row) die("updatePnote() did not find id '$id'");
   $activity = $assigned_to ? '1' : '0';
-
-  // make inactive if set as Done
-  if ($message_status == "Done") $activity = 0;
 
   $body = $row['body'] . "\n" . date('Y-m-d H:i') .
     ' (' . $_SESSION['authUser'];
@@ -361,28 +266,23 @@ function updatePnote($id, $newtext, $title, $assigned_to, $message_status = "")
 
 function updatePnoteMessageStatus($id, $message_status)
 {
-  if ($message_status == "Done") {
-    sqlStatement("update pnotes set message_status = ?, activity = '0' where id = ?", array($message_status, $id) );
-  }
-  else {
-    sqlStatement("update pnotes set message_status = ?, activity = '1' where id = ?", array($message_status, $id) );
-  }
+  sqlStatement("update pnotes set message_status = ? where id = ?", array($message_status, $id) );
 }
 
 function authorizePnote($id, $authorized = "1")
 {
-  sqlQuery("UPDATE pnotes SET authorized = ? WHERE id = ?", array ($authorized,$id) );
+  sqlQuery("UPDATE pnotes SET authorized = '$authorized' WHERE id = '$id'");
 }
 
 function disappearPnote($id)
 {
-  sqlStatement("UPDATE pnotes SET activity = '0', message_status = 'Done' WHERE id=?", array($id) );
+  sqlStatement("UPDATE pnotes SET activity = '0' WHERE id=?", array($id) );
   return true;
 }
 
 function reappearPnote ($id)
 {
-  sqlStatement("UPDATE pnotes SET activity = '1', message_status = IF(message_status='Done','New',message_status) WHERE id=?", array($id) );
+  sqlStatement("UPDATE pnotes SET activity = '1' WHERE id=?", array($id) );
   return true;
 }
 

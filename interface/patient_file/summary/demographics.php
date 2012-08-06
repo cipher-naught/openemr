@@ -131,7 +131,7 @@ $vitals_is_registered = $tmp['count'];
 <?php include_once("{$GLOBALS['srcdir']}/dynarch_calendar_en.inc.php"); ?>
 <script type="text/javascript" src="../../../library/dynarch_calendar_setup.js"></script>
 <script type="text/javascript" src="../../../library/dialog.js"></script>
-<script type="text/javascript" src="../../../library/js/jquery-1.6.4.min.js"></script>
+<script type="text/javascript" src="../../../library/js/jquery.1.3.2.js"></script>
 <script type="text/javascript" src="../../../library/js/common.js"></script>
 <script type="text/javascript" src="../../../library/js/fancybox/jquery.fancybox-1.2.6.js"></script>
 <script type="text/javascript" language="JavaScript">
@@ -529,7 +529,7 @@ if ($GLOBALS['patient_id_category_name']) {
     <!-- start left column div -->
     <div style='float:left; margin-right:20px'>
      <table cellspacing=0 cellpadding=0>
-      <tr<?php if ($GLOBALS['athletic_team']) echo " style='display:none;'"; ?>>
+      <tr>
        <td>
 <?php
 // Billing expand collapse widget
@@ -827,7 +827,7 @@ if ( $insurance_count > 0 ) {
 $widgetTitle = xl("Notes");
 $widgetLabel = "pnotes";
 $widgetButtonLabel = xl("Edit");
-$widgetButtonLink = "pnotes_full.php?form_active=1";
+$widgetButtonLink = "pnotes_full.php";
 $widgetButtonClass = "";
 $linkMethod = "html";
 $bodyClass = "notab";

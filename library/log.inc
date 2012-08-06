@@ -1,7 +1,6 @@
 <?php
 #require_once("{$GLOBALS['srcdir']}/sql.inc");
 require_once(dirname(__FILE__). "/sql.inc");
-require_once(dirname(__FILE__). "/formdata.inc.php");
 
 function newEvent($event, $user, $groupname, $success, $comments="") {
     $adodb = $GLOBALS['adodb']['db'];
@@ -12,7 +11,8 @@ function newEvent($event, $user, $groupname, $success, $comments="") {
             "," . $adodb->qstr($groupname) . "," . $adodb->qstr($success) . "," .
             $adodb->qstr($comments) ."," .
             $adodb->qstr($crt_user) .  ")";
-
+    //$ret = sqlInsertClean($sql);
+    // Call the new function created for audit log
     $ret = sqlInsertClean_audit($sql);
     send_atna_audit_msg($user, $groupname, $event, 0, $success, $comments);
 }
@@ -478,9 +478,8 @@ function send_atna_audit_msg($user, $group, $event, $patient_id, $outcome, $comm
  * successfully completed.  Determine the event type based on
  * the tables present in the SQL query.
  */
-function auditSQLEvent($statement, $outcome, $binds=NULL)
+function auditSQLEvent($statement, $outcome)
 {
-
     $user =  isset($_SESSION['authUser']) ? $_SESSION['authUser'] : "";
 	/* Don't log anything if the audit logging is not enabled. Exception for "emergency" users */
    if (!isset($GLOBALS['enable_auditlog']) || !($GLOBALS['enable_auditlog']))
@@ -488,7 +487,22 @@ function auditSQLEvent($statement, $outcome, $binds=NULL)
    	    if ((soundex($user) != soundex("emergency")) && (soundex($user) != soundex("breakglass")))
    	    return;
    }
+// ViCarePlus : Fix for Audit Issue :: Sep 24, 2010 
 
+// Issue:  When the audit logging is enabled and when SELECT QUERY (query=1 in globals.php) is enabled to log, 
+// the issue of LAST_INSERT_ID arises.  
+// This is because, the function sql_checksum_of_modified_row() is triggered more than 
+// once for SELECT Queries and thus the expected value (LAST_INSERT_ID) in the $GLOBALS['lastidado'] is getting altered. 
+// Since, the $GLOBALS['lastidado'] is manipulated by the other function calls(sql_checksum_of_modified_row), 
+// this issue is arised.
+
+// Fix:
+// The task of assigning LAST_INSERT_ID  to a global variable $GLOBALS['lastidado']  is moved from sql.inc to this file.
+// Following code will get executed, when (a) when audit is enabled (b) When break glass is invoked.
+// Retrieve LAST_INSERT_ID and assign it to a global variable and eventually it can be used by other functions.
+    $lastid=mysql_insert_id($GLOBALS['dbh']);
+    $GLOBALS['lastidado']=$lastid;
+// ViCarePlus : Audit fix - ends here :: Sep 24,2010 
 
    $statement = trim($statement);
 
@@ -502,35 +516,13 @@ function auditSQLEvent($statement, $outcome, $binds=NULL)
 
     $group = isset($_SESSION['authGroup']) ?  $_SESSION['authGroup'] : "";
     $comments = $statement;
-
-    $processed_binds = "";
-    if (is_array($binds)) {
-        // Need to include the binded variable elements in the logging
-        $first_loop=true;
-        foreach ($binds as $value_bind) {
-            if ($first_loop) {
-                //no comma
-                $processed_binds .= "'" . add_escape_custom($value_bind) . "'";
-                $first_loop=false;
-            }
-            else {
-                //add a comma
-                $processed_binds .= ",'" . add_escape_custom($value_bind) . "'";
-            }
-        }
-        if (!empty($processed_binds)) {
-            $processed_binds = "(" . $processed_binds . ")";
-            $comments .= " " . $processed_binds;
-        }
-    }
-
     $success = 1;
     $checksum = "";
     if ($outcome === FALSE) {
         $success = 0;
     }
     if ($outcome !== FALSE) {
-        $checksum = sql_checksum_of_modified_row($comments);
+        $checksum = sql_checksum_of_modified_row($statement);
     }
     /* Determine the query type (select, update, insert, delete) */
     $querytype = "select";
@@ -697,6 +689,8 @@ function auditSQLEvent($statement, $outcome, $binds=NULL)
          $adodb->qstr($checksum) . "," .
          $adodb->qstr($_SERVER['SSL_CLIENT_S_DN_CN']) .")";
 
+    //$ret = sqlInsertClean($sql);
+    //ViSolve: Call the new function created for audit logs
     sqlInsertClean_audit($sql);
     send_atna_audit_msg($user, $group, $event, $pid, $success, $comments);
     //return $ret;

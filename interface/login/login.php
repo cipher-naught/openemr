@@ -14,7 +14,6 @@ include_once("$srcdir/md5.js");
 <head>
 <?php html_header_show(); ?>
 <link rel=stylesheet href="<?php echo $css_header;?>" type="text/css">
-<link rel=stylesheet href="../themes/login.css" type="text/css">
 
 <script language='JavaScript' src="../../library/js/jquery-1.4.3.min.js"></script>
 <script language='JavaScript'>
@@ -123,13 +122,13 @@ else {
 }
 ?>
 
-<table width="100%" height="90%">
-<td align='center' valign='middle' width='34%'>
-<div class="login-box">
-<div class="logo-left"><?php echo $logocode;?></div>
-
-<div class="table-right">
-<table width="100%">
+<table width=100% height="90%">
+<tr>
+<td valign=middle width=33%>
+<?php echo $logocode;?>
+</td>
+<td align='center' valign='middle' width=34%>
+<table>
 <?php if (count($result) != 1) { ?>
 <tr>
 <td><span class="text"><?php xl('Group:','e'); ?></span></td>
@@ -161,11 +160,11 @@ Invalid username or password
 <tr>
 <td><span class="text"><?php xl('Username:','e'); ?></span></td>
 <td>
-<input class="entryfield" type="text" size="10" name="authUser">
+<input type="text" size="10" name="authUser">
 </td></tr><tr>
 <td><span class="text"><?php xl('Password:','e'); ?></span></td>
 <td>
-<input class="entryfield" type="password" size="10" name="clearPass">
+<input type="password" size="10" name="clearPass">
 </td></tr>
 
 <?php
@@ -174,7 +173,7 @@ if (count($result3) != 1) { ?>
 <tr>
 <td><span class="text"><?php xl('Language','e'); ?>:</span></td>
 <td>
-<select class="entryfield" name=languageChoice size="1">
+<select name=languageChoice size="1">
 <?php
         echo "<option selected='selected' value='".$defaultLangID."'>" . xl('Default','','',' -') . xl($defaultLangName,'',' ') . "</option>\n";
         foreach ($result3 as $iter) {
@@ -199,9 +198,9 @@ if (count($result3) != 1) { ?>
 <input type="hidden" name="authNewPass">
 <?php if (isset($GLOBALS['use_adldap_auth']) && ($GLOBALS['use_adldap_auth']== true)): ?>
 <!-- ViCareplus : As per NIST standard, the SHA1 encryption algorithm is used -->
-<input class="button large" type="submit" onClick="javascript:this.form.authPass.value=SHA1(this.form.clearPass.value);" value=<?php xl('Login','e');?>>
+<input type="submit" onClick="javascript:this.form.authPass.value=SHA1(this.form.clearPass.value);" value=<?php xl('Login','e');?>>
 <?php else: ?>
-<input class="button large" type="submit" onClick="chk_hash_fn();" value=<?php xl('Login','e');?>>
+<input type="submit" onClick="chk_hash_fn();" value=<?php xl('Login','e');?>>
 <?php endif; ?>
 </td></tr>
 <tr><td colspan='2' class='text' style='color:red'>
@@ -221,26 +220,27 @@ if ($result = sqlFetchArray($statement)) {
 *********************************************************************/
 
 ?>
-</div>
 </td></tr>
 </table>
-
-</div>
-<div style="clear: both;"> </div>
-<div class="version">
-<?php echo "v$openemr_version" ?> | <a  href="../../copyright_notice.html" target="main"><?php xl('Copyright Notice','e'); ?></a>
-</div>
-</div>
-<div class="demo">
-		<!-- Uncomment this for the OpenEMR demo installation
-		<p><center>login = admin
-		<br>password = pass
-		-->
-</div>
 </td>
-</tr>
+<td width=33%>
+
+<!-- Uncomment this for the OpenEMR demo installation
+<p><center>login = admin
+<br>password = pass
+-->
+
+</center></p>
+
+</td>
 </table>
+
 </form>
+
+<address>
+<a href="../../copyright_notice.html" target="main"><?php xl('Copyright Notice','e'); ?></a><br />
+</address>
+
 </center>
 </body>
 </html>

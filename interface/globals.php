@@ -312,6 +312,10 @@ if ($GLOBALS['concurrent_layout']) {
  $nav_bg_line = ' bgcolor="#94d6e7" ';
 }
 $login_filler_line = ' bgcolor="#f7f0d5" ';
+<<<<<<< HEAD
+=======
+$login_body_line = ' background="'.$rootdir.'/pic/aquabg.gif" ';
+>>>>>>> 0595137976a210774131ff6dbb19c4a3a74b068f
 $logocode = "<img src='$web_root/sites/" . $_SESSION['site_id'] . "/images/login_logo.gif'>";
 $linepic = "$rootdir/pic/repeat_vline9.gif";
 $table_bg = ' bgcolor="#cccccc" ';

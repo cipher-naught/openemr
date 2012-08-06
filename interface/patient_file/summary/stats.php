@@ -46,6 +46,7 @@ if (!$thisauth) {
 	
 <?php
 $numcols = '1';
+$ix = 0;
 $erx_upload_complete = 0;
 $old_key="";$display_current_medications_below=1;
 foreach ($ISSUE_TYPES as $key => $arr) {
@@ -118,7 +119,7 @@ foreach ($ISSUE_TYPES as $key => $arr) {
 	    <?php }
 	    $old_key='';
     }
-    if (sqlNumRows($pres) > 0 || $arr[4] == 1) {
+    if (sqlNumRows($pres) > 0 || $ix == 0 || $key == "allergy" || $key == "medication") {
 	$old_key=$key;
 	if ($_POST['embeddedScreen']) {
 	    
@@ -208,6 +209,7 @@ foreach ($ISSUE_TYPES as $key => $arr) {
         }
 	
     }
+    ++$ix;
 }
 ?>
 </table> <!-- end patient_stats_issues -->
