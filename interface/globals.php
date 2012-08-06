@@ -29,6 +29,11 @@
 if (!defined('IS_WINDOWS'))
  define('IS_WINDOWS', (stripos(PHP_OS,'WIN') === 0));
 
+
+//ZEND Changes
+set_include_path(get_include_path() . PATH_SEPARATOR . dirname(__FILE__) . '/../library/zend_framework_1.11');
+
+$lclTest = get_include_path();
 // Some important php.ini overrides. Defaults for these values are often
 // too small.  You might choose to adjust them further.
 //
@@ -99,10 +104,6 @@ if (preg_match("/^[^\/]/",$web_root)) {
 //   $webserver_root = "/var/www/openemr";
 //   $web_root =  "/openemr";
 //
-
-#$webserver_root = "C:/dev/OpenEMR/Source/MyOpenEMR/desktopOpenemr/openemr";
-#$web_root =  "/openemrDev";
-
 // This is the directory that contains site-specific data.  Change this
 // only if you have some reason to.
 $GLOBALS['OE_SITES_BASE'] = "$webserver_root/sites";
