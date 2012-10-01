@@ -9,7 +9,7 @@
 
 require_once (dirname(__FILE__) ."/../../../../library/sql.inc");
 require_once (dirname(__FILE__) ."/../../../../library/parsecsv.lib.php");
-require_once dirname(__FILE__) ."/../../../../library/classes/DataImportTable.php";
+require_once dirname(__FILE__) ."/../../../../library/classes/dataImportTable.php";
 require_once dirname(__FILE__) ."/../../../../library/classes/databaseQueryBuilder.php";
 
 class Application_Model_CsvFileImportMapper
