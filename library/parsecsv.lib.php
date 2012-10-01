@@ -368,7 +368,15 @@ class parseCSV {
 			// open and closing quotes
 			if ( $ch == $this->enclosure && (!$enclosed || $nch != $this->enclosure) ) {
 				$enclosed = ( $enclosed ) ? false : true ;
-				if ( $enclosed ) $was_enclosed = true;
+				if ( $enclosed ) {
+					$was_enclosed = true;
+					if(strlen(trim($current)) == 0) { //Check to see if there was white space before like ", 'Value'"
+						$current = "";
+					}
+				}
+				else {
+					
+				}
 			
 			// inline quotes	
 			} elseif ( $ch == $this->enclosure && $enclosed ) {

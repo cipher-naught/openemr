@@ -75,7 +75,7 @@ class Application_Model_DbMapper
 		$retVal = array();
 		foreach($lclVal as $column) {
 			if($column->type == "date") {
-				$retVal[] = $column->name."*";
+				$retVal[] = $column->name." (".xl('Date').")";
 			}
 			else {
 				$retVal[] = $column->name;

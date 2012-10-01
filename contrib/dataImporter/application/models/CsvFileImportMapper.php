@@ -9,6 +9,8 @@
 
 require_once (dirname(__FILE__) ."/../../../../library/sql.inc");
 require_once "/../../../../library/parsecsv.lib.php";
+require_once dirname(__FILE__) ."/../../../../library/classes/DataImportTable.php";
+require_once dirname(__FILE__) ."/../../../../library/classes/databaseQueryBuilder.php";
 
 class Application_Model_CsvFileImportMapper
 {
@@ -44,6 +46,26 @@ class Application_Model_CsvFileImportMapper
 		return $this->uploadLocation;
 		
 	}	
+	
+	public function getMatchingIDs($val) {
+		$_db = $GLOBALS['adodb']['db'];
+		$resultSet = array();
+		
+		foreach($val as $whereLine) {
+			$result = sqlQuery("SELECT `patient_data`.`pid`, count(1) as `matchCount` from `patient_data` where ".$whereLine);
+			if(isset($result['matchCount']) && $result['matchCount'] == 1) { //Value found.
+				array_push($resultSet, $result['pid']);
+			}
+			elseif($result['matchCount'] > 1) { //Too many results, error.
+				array_push($resultSet, -2);
+			}
+			else {
+				array_push($resultSet, -1);
+			}
+			
+		}
+		return $resultSet;
+	}
 	
 	/**
 	 * Gets the full path for a file name and checks for directory transversal.
@@ -84,7 +106,9 @@ class Application_Model_CsvFileImportMapper
 		
 	}
 	
-	//Update
+	
+
+	
 	/**
 	 * Generates an array(s) of data specified in the file.
 	 * @param filepointer $fileNamePointer
@@ -95,7 +119,9 @@ class Application_Model_CsvFileImportMapper
 	 * @param int $numberOfRows
 	 * @return multitype:multitype: either a single array if no columns specified, or 2 arrays if columns are specified
 	 */
-	public function generateTableArray($fileName, $fieldDelimiter, $txtQualifier, $firstRowColumnNames = false, $numberOfRows =NULL, $encoding='UTF-8') {
+	public function generateTableArray($fileName, $fieldDelimiter, $txtQualifier, $firstRowColumnNames = false, $numberOfRows =NULL, 
+			 $encoding='UTF-8') {
+		$outputTable = new DataImportTable();
 		$output = array();
 			
 		//If first, then do the number of rows		
@@ -105,7 +131,8 @@ class Application_Model_CsvFileImportMapper
 		$csv = new parseCSV();
 		$this->setupParser($csv, $fieldDelimiter, $txtQualifier, $encoding, $firstRowColumnNames);
 		
-		if(isset($numberOfRows)) {
+		//Set limit for number of rows as long as not set to all.
+		if(isset($numberOfRows) && $numberOfRows != "All") {
 			$csv->limit = $numberOfRows;
 		}
 		
@@ -113,13 +140,19 @@ class Application_Model_CsvFileImportMapper
 		foreach($csv->data as $key => $row) {
 			array_push($output, $row);
 		}
+		$outputTable->setData($output);
+		
 		if($firstRowColumnNames) {
-			return array($output,$csv->titles);
+			$outputTable->setKnownColumnHeadings(true);
+			$outputTable->setColumns($csv->titles);
 		}
 		else {
-			return array($output);
+			$outputTable->setKnownColumnHeadings(false);
 		}
+		
+		return $outputTable;
 	}
+	
 	
 	public function dateHelper($value, $dateFormat) {
 		//Add logic for two digit date
@@ -146,6 +179,8 @@ class Application_Model_CsvFileImportMapper
 		}
 	}
 	
+	
+	
 	/**
 	 * Process the import of the file given the following parameters.
 	 * @param filepointer $filePointer
@@ -158,13 +193,13 @@ class Application_Model_CsvFileImportMapper
 	 * @return boolean success or failure
 	 */
 	public function importFile($fileName, $tableName, $columnRules,$txtEncoding, $fieldDelimit, 
-			$txtQualifier, $firstRowIsColumnHeaders, $dateFormat) {
+			$txtQualifier, $firstRowIsColumnHeaders, $dateFormat, $updateSkipInformation) {
 				
 		$_db = $GLOBALS['adodb']['db'];
 		$_db->StartTrans();
 		$counter = 0; // to omission first row if it is table headers, 0 => Skip first row
 		$success = false;
-		
+		$databaseTableHelper = new DataImportTable();
 		$successObject = array("success" => false,
 							    "rolledback" => false,
 				                "successfulTransactions" => 0,
@@ -182,57 +217,112 @@ class Application_Model_CsvFileImportMapper
 				$idVal = intval($result['id']);
 			}
 		}
-		if($tableName == "patient_data") {
-			$result = sqlQuery("SELECT MAX(pid)+1 AS pid FROM ".$tableName);
-			$pidVal = -1;
-			if($result != null) {
-				//There is an ID field
-				if($result['pid'] == null) { //first insert
-					$pidVal = 1;
+		$csv->parse($fileName);
+		$i = 0;
+		$databaseColumnList = $databaseTableHelper->getDatabaseColumnList($tableName, true);
+		
+		$actionID = -1;
+		$criteria = NULL;
+		foreach($csv->data as $key => $row) {
+			$columnArray = array();
+			$valueArray = array();
+			//Parse Skip Information
+			$lineAction = "SKIP"; //for skip 
+			if(isset($updateSkipInformation)) {
+				if(is_array($updateSkipInformation)) {
+					$lineAction = $updateSkipInformation[$i];
+					
 				}
 				else {
-					$pidVal = intval($result['pid']);
+					$lineAction = $updateSkipInformation;
+				}
+				switch($lineAction) {
+					case -1:
+						$lineAction = "INSERT";
+						break;
+					case -2:
+						$lineAction = "UPDATE";
+						break;
+					case "A":
+						$lineAction = "INSERT";
+						break;
+					case "S":
+						$lineAction = "SKIP";
+						break;
+					case -2:
+						$lineAction = "SKIP";
+						break;
+					default: 
+						$actionID = $lineAction;
+						$lineAction = "UPDATE";
+						break;
 				}
 			}
-		}
-		$csv->parse($fileName);
-		foreach($csv->data as $key => $row) {
-			$outputLine1 = "insert into $tableName (";
-			$outputLine2 = "\nValues (";
-			if($idVal != -1) {
-				$outputLine1 .= "id, ";
-				$outputLine2 .= $idVal.", ";
+			else {
+				$lineAction = "INSERT";
 			}
-			if($tableName == "patient_data") {
-				$outputLine1 .= "pid, ";
-				$outputLine2 .= $pidVal.", ";
+			if($lineAction == "SKIP") {
+				continue; //Skip skip lines.
+			}
+			//Get PID if inserting into patient_data.
+			if($lineAction == "INSERT" && $tableName == "patient_data") {
+				$result = sqlQuery("SELECT MAX(pid)+1 AS pid FROM ".$tableName);
+				$pidVal = -1;
+				if($result != null) {
+					//There is an ID field
+					if($result['pid'] == null) { //first insert
+						$pidVal = 1;
+					}
+					else {
+						$pidVal = intval($result['pid']);
+					}
+				}
+			}
+			if($idVal != -1 && $lineAction == "INSERT") {
+				array_push($columnArray,"id");
+				array_push($valueArray,$idVal);
+			}
+			if($tableName == "patient_data" && $lineAction == "INSERT") {
+				array_push($columnArray,"pid");
+				array_push($valueArray,$pidVal);
 			}
 			$c= 0;
-			$arrayArgs = array();
+			
+			 
 			$valuesToInsert = false;
 			$columnsToInsert = false;
 			foreach ($row as $value) {
 				//See if the row has any values.
+				
 				if(!$valuesToInsert && $value != NULL) {
 					$valuesToInsert = true;
 				}
 				if($columnRules[$c] != Null) {
 					$columnsToInsert = true;
 					
-					if(strpos($columnRules[$c],"*") === FALSE) {
-						$outputLine1 .=  '`'.str_replace('`','',$columnRules[$c]) ."`, ";
-						array_push($arrayArgs, $_db->qstr($value));
+					if(isset($databaseColumnList[$columnRules[$c]]) && //Check that column exists to prevent injection attacks. 
+							$databaseColumnList[$columnRules[$c]] != "date") {
+							array_push($columnArray,$columnRules[$c]);
+							array_push($valueArray, $value);
 					}
-					else { //Format Date
-						$outputLine1 .=  "`".str_replace('`','',substr($columnRules[$c],0,-1)) ."`, ";
-						array_push($arrayArgs, $this->dateHelper($value,$dateFormat));
+					elseif(isset($databaseColumnList[$columnRules[$c]]) && //Check that column exists to prevent injection attacks. 
+							$databaseColumnList[$columnRules[$c]] == "date") { //Need to know the date information.
+							array_push($columnArray,$columnRules[$c]);
+							array_push($valueArray,$this->dateHelper($value,$dateFormat));
 					}
-					$outputLine2 .= "?, ";
+					else {
+						die("Security Violation on insert.");
+					}
 				}
 				$c++;
 			}
 			if($columnsToInsert && $valuesToInsert) {
-				$successObject["success"] = $_db->Execute(rtrim($outputLine1,", "). ")".rtrim($outputLine2,", ").");\n\n",$arrayArgs);
+				if($lineAction == "UPDATE" && $tableName == "patient_data") {
+					$criteria = "`pid` = ?";
+					array_push($valueArray,$actionID);
+					array_push($columnArray,'pid');
+				}
+				$successObject["success"] = $_db->Execute(DatabaseQueryBuilder::generateSQL($tableName,$columnArray, $valueArray, $lineAction,$criteria),$valueArray);
 				if($pidVal != -1) $pidVal++;
 				if($idVal != -1) $idVal++;
 				if(!$successObject["success"]) {

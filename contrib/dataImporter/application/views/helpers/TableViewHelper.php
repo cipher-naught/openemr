@@ -7,6 +7,8 @@
 // as published by the Free Software Foundation; either version 2
 // of the License, or (at your option) any later version.
 
+require_once dirname(__FILE__) ."/../../../../../library/classes/DataImportTable.php";
+
 class Zend_Helper_TableViewHelper extends Zend_View_Helper_Abstract
 {
 	public function tableViewHelper() {
@@ -16,37 +18,143 @@ class Zend_Helper_TableViewHelper extends Zend_View_Helper_Abstract
 	 * Generate HTML table from data specified.
 	 * @param array $tableData
 	 * @param array $listOfColumns
-	 * @param arry $columnChoice 
+	 * @param array $columnChoice values from postback, if none specified will use list of $listOfColumns.
+	 * @param array $matchingValues values used in matching.
 	 * @return string HTML table
 	 */
-	public function generateTable($tableData, $listOfColumns, $columnChoice = NULL) {
+	public function generateTable($tableData, $listOfColumns, $columnChoice = NULL, $matchingValues = NULL) {
 	
 		$output =  "<table border=\"1\"><tr>";
 		$i = 0;
-		$lclColumns = array_merge(array("skip"), $listOfColumns);
-		if(isset($columnChoice)) { 
-			foreach($columnChoice as $value) {
-				$output = $output."<td>".$this->generateSelectList($lclColumns, $i, $value)."</td>";
-				$i++;
+		$lclTableData = $tableData->getData();
+		$optionArray = array("actions"  => array(),
+				             "columns"  => array(),
+				             "matching" => array()); 
+		//Header Row
+			//Needs to be updated to include matching columns.
+			
+			$optionArray["actions"]["-skip"] = "skip";
+			foreach($matchingValues as $key => $matchRuleValue) {
+				if($matchRuleValue == true) {
+					$optionArray["matching"]["*$key"] = $key;
+				}
 			}
-			$output .= "</tr>\n";
-		}
-		else {
-			for($i=0;$i<count($tableData[0]); $i++)
-			{
-				$output = $output."<td>".$this->generateSelectList($lclColumns, $i)."</td>";
+			if(count($optionArray["matching"]) == 0) {
+				unset($optionArray["matching"]); //If no matching values then remove choice.
 			}
-			$output .= "</tr>\n";
-		}
-		foreach($tableData as $row) {
+			foreach($listOfColumns as $col) {
+				//Remove (DATE), etc options.
+				if(strpos($col," (") === FALSE) { //" (" not found
+					$optionArray["columns"][strtolower($col)]= $col;
+				}
+				else {
+					$optionArray["columns"][strtolower(substr($col,0,strpos($col," (")))]= $col;
+				}
+				
+			}
+			if(isset($columnChoice) && count($columnChoice) >0) {
+				$output = $output."<td>
+						<select onChange=\"updateRowOptions(this)\">
+						<option value=\"\"> </option>
+						<option value=\"S\">S</option>
+						<option value=\"U\">U</option>
+						<option value=\"A\">A</option>
+						</select>
+								</td>"; //Provide blank space for column matching.
+				$i =0;
+				foreach($columnChoice as $value) { //TODOCmp: problem here
+					$output = $output."<td>".$this->generateSelectList($optionArray, $i, $value)."</td>";
+					$i++;
+				}
+				if($i < count($lclTableData[0])) { //Then we need to add columns.
+					for($j=$i;$j< count($lclTableData[0]); $j++)
+					$output = $output."<td>".$this->generateSelectList($optionArray, $j, null)."</td>";
+				}
+				$output .= "</tr>\n";
+			}
+			else {
+				$output = $output."<td>
+						<select onChange=\"updateRowOptions(this)\">
+						<option value=\"\"> </option>
+						<option value=\"S\">S</option>
+						<option value=\"U\">U</option>
+						<option value=\"A\">A</option>
+						</select>
+								</td>"; //Provide blank space for column matching.
+				//Generate a select list for each.
+				for($i=0;$i<count($lclTableData[0]); $i++)
+				{	//changed from $optionArray $listOfColumns
+					$output = $output."<td>".$this->generateSelectList($optionArray, $i)."</td>";
+				}
+				$output .= "</tr>\n";
+			}
+		$i = 0;
+		$actionIds = $tableData->getActionIds();
+		foreach($lclTableData as $row) {
 			$output .= "<tr>";
+			//Set the add or update values.  Will need to set a hidden value for the PID in question.
+			//Need to add if statement incase not used.
+			$actionID = $actionIds === NULL ? -1 : $actionIds[$i];
+			$output .= "<td>".$this->createActionColumn($actionID, $i)."</td>";
+						
 			foreach($row as $value) {
 				$output .= "<td>".htmlspecialchars($value,ENT_QUOTES)."</td>";
 			}
 			$output .= "</tr>";
+			$i++;
 		}
 		$output .= "</table>";
 		return $output;
+	}
+	
+	public function createActionColumn($id, $rowNum) {
+		//0 or more - ID 
+		//-1 - does not exist.
+		//-2 - more than one result returned.
+		$action = new Zend_Form_Element_Select("action_$rowNum");
+		$hidActionID = new  Zend_Form_Element_Hidden("hidActionID_$rowNum");
+		if(isset($id) && $id !== NULL && $id > -1) { //we have a valid value
+			//Update
+			$action->addMultiOption("S","S");
+			$action->addMultiOption("U","U");
+			$action->addMultiOption("A","A");
+			$action->setValue("U");
+			
+			$hidActionID->setValue($id);
+			
+		}
+		elseif(isset($id) && $id !== NULL && $id < -1) { //Number is -2 or less, so you can only skip.
+			//Probably too many results.  Make it so you can only skip.
+			$action->addMultiOption("S","S");
+			$action->setValue("S");
+			$hidActionID->setValue($id);
+			 
+		}
+		elseif(isset($id) && $id !== NULL && $id == -1) {
+			//Add Value, it does not exist.
+			$action->addMultiOption("A","A");
+			$action->addMultiOption("S","S");
+			$action->setValue("A");
+			$hidActionID->setValue($id);
+			
+		}
+		else {
+			//Error, same as //Number is negative, so you can only skip.
+			$i = 6;
+		}
+		
+		//May need to remove decorators.
+		$action->removeDecorator('DtDdWrapper');
+		$action->removeDecorator('Errors');
+		$action->removeDecorator('HtmlTag');
+		$action->removeDecorator('Label');
+		$hidActionID->removeDecorator('DtDdWrapper');
+		$hidActionID->removeDecorator('Errors');
+		$hidActionID->removeDecorator('HtmlTag');
+		$hidActionID->removeDecorator('Label');
+		
+		return $action->render()." ".$hidActionID->render();
+		
 	}
 	/**
 	 * Generates the select list for display at top of columns
@@ -58,11 +166,10 @@ class Zend_Helper_TableViewHelper extends Zend_View_Helper_Abstract
 	public function generateSelectList($fieldArray, $nameID, $headerValue = NULL) {
 	
 		$category = new Zend_Form_Element_Select('column');
-		foreach($fieldArray  as $data) {
-			$category->addMultiOption($data,$data);
-		}
-		//$category->addMultiOption('skip','skip');
-		//$category->addMultiOption('FirstName','FirstName');
+		
+		
+		$category->setMultiOptions($fieldArray);
+
 		$category->removeDecorator('Errors');
 		$category->removeDecorator('HtmlTag');
 		$category->removeDecorator('Label');
@@ -70,14 +177,19 @@ class Zend_Helper_TableViewHelper extends Zend_View_Helper_Abstract
 		$category->name = "name_".$nameID;
 		//array_push($columnArry, $category);
 		if(isset($headerValue)) {
-			//Do case insensitive search
-			$arr2 = array_map('strtoupper', $fieldArray);
-			$key = array_search(strtoupper($headerValue), $arr2);
-			if($key) {
-				$category->setValue($fieldArray[$key]);
+			
+			$valueFound = false;
+			foreach($fieldArray["columns"] as $key => $value) {
+				if($key == strtolower($headerValue) || $headerValue == $key) {
+					$category->setValue($key);
+					$valueFound = true;
+					break;
+				}
+				
 			}
-			else { //$key not found, set to skip.
-				$category->setValue("skip");
+			//If no value found, set to false.
+			if(!$valueFound) {
+				$category->setValue("-skip");
 			}
 		}
 		return $category->render();

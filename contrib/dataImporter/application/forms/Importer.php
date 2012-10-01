@@ -8,14 +8,18 @@
 // of the License, or (at your option) any later version.
 
 
+require_once (dirname(__FILE__) ."/../../../../library/sql.inc");
+require_once (dirname(__FILE__) ."/../../../../library/classes/dataImportTable.php");
 class Application_Form_Importer extends Zend_Form
 {
 
 	public $columnListSet;
 	public $previewTableStatus;
 	public $previewTableData;
+	public $previewTableDataMatching;
 	public $previewTableStatusMessage;
 	public $lblOutput;
+	public $previewTableColumnRules;
 	
 		
 	/**
@@ -34,7 +38,7 @@ class Application_Form_Importer extends Zend_Form
     	$fielddDelimit->addMultiOption(9,"(Tab)");
     	$fielddDelimit->setValue(44);
     	$fielddDelimit->setAttribs(array(
-    				"onchange" => "SetElement(this.value,this.attributes[\"id\"].value+\"Box\")"
+    				"onchange" => "SetElement(this.value,this.attributes[\"id\"].value+\"Box\");configurationChanged();"
     			)
     			);
 
@@ -43,6 +47,19 @@ class Application_Form_Importer extends Zend_Form
     	
     } 
     
+    
+    public function getPatternMatchingArray() {
+    	return array(
+    
+    					"lname" => $this->getElement('matchLName')->isChecked(),
+    					"fname" => $this->getElement('matchFName')->isChecked(),
+    					"mname" => $this->getElement('matchMName')->isChecked(),
+    					"SS" => $this->getElement('matchSS')->isChecked(),
+    					"DOB" => $this->getElement('matchDateOfBirth')->isChecked(),
+    					"sex" => $this->getElement('matchSex')->isChecked(),
+    					"patient_id" => $this->getElement('matchPatient_Id')->isChecked()
+    			);
+    }
     public function createDateFormatSelectList($name)
     {
     	//From http://dev.mysql.com/doc/refman/5.5/en/date-and-time-functions.html#function_get-format
@@ -73,7 +90,7 @@ class Application_Form_Importer extends Zend_Form
     	$localSelect->addMultiOption(0,"Other");
     	$localSelect->addMultiOption(34,"\"");
     	$localSelect->addMultiOption(39,"'");
-    	$localSelect->addMultiOption(96,"`");  //TODOcmp: May need to update
+    	$localSelect->addMultiOption(96,"`");  
     	$localSelect->addMultiOption(124,"| (Pipe");
     	$localSelect->setValue(34);
     	$localSelect->setAttribs(array(
@@ -93,6 +110,7 @@ class Application_Form_Importer extends Zend_Form
     	$localSelect->addMultiOption("10","10");
     	$localSelect->addMultiOption("40","40");
     	$localSelect->addMultiOption("100","100");
+    	$localSelect->addMultiOption("All","All");
     	return $localSelect;
     }
     
@@ -159,9 +177,11 @@ class Application_Form_Importer extends Zend_Form
     	
     	$localSelect->setAttribs(array(
     			"size" => 4,
-    			"style" => "min-width: 200px;"
+    			"style" => "min-width: 500px;",
+    			"onChange" => "fileSelected()"
     			)
     	);
+    	$localSelect->removeDecorator('Label');
     	return $localSelect;
     }
     
@@ -205,9 +225,14 @@ class Application_Form_Importer extends Zend_Form
 
     	$element->addValidator('Count', false, 1);
     	$element->addValidator('Size',false,29*1024*1024);
+    	$element->setAttrib("class", "file");
+    	    	
+    	$element->removeDecorator('DtDdWrapper');
+    	$this->clearDecorators($element);
     	$this->addElement($element, 'dataFile');
     	
     	$fieldDelimit = $this->createFieldDelimitSelectList('fieldDelimit');
+    	
     	
     	$this->addElement($fieldDelimit,'fieldDelimit');
     	
@@ -219,31 +244,47 @@ class Application_Form_Importer extends Zend_Form
     	$this->addElement($txtQualifier,'txtQualifier');
     	
     	$txtEncoding = $this->createTextEncoding('txtEncoding');
+    	$txtEncoding->setAttribs(array(
+    			"onclick"=>"configurationChanged()",
+    			"style" => "width:160px"
+    	));
     	$this->addElement($txtEncoding,'txtEncoding');
     	
     	$this->setAttrib('enctype','multipart/form-data');
 
     	$fileUpload = new Zend_Form_Element_Submit('uploadFile');
+    	
     	$fileUpload->setLabel("Upload File");
     	
     	$this->clearDecorators($fileUpload);
+    	$fileUpload->removeDecorator('DtDdWrapper');
+    	 
     	$this->addElement($fileUpload,'uploadFile');
     	
-    	$fileApply = new Zend_Form_Element_Submit('apply');
+    	$fileApply = new Zend_Form_Element_Submit('Preview');
     	$fileApply->setLabel("Apply");
     	$this->clearDecorators($fileApply);
     	$fileApply->removeDecorator('DtDdWrapper');
-    	$this->addElement($fileApply,'apply');
+    	$fileApply->setAttribs(array(
+    			"disable" => true,
+    			"style" => "width:90px;"
+    	)
+    	);
+    	
+    	$this->addElement($fileApply,'Preview');
 
     	
-    	$fileDelete = new Zend_Form_Element_Submit('delete');
+    	$fileDelete = new Zend_Form_Element_Submit('Delete');
     	$fileDelete->setAttribs(array(
-    			"onclick" => "return ConfirmFileDelete(this)"
+    			"onclick" => "return ConfirmFileDelete(this)",
+    			"disable" => true,
+    			"style" => "width:90px;"
+    			
     			)
     	);
     	$this->clearDecorators($fileDelete);
     	$fileDelete->removeDecorator('DtDdWrapper');
-    	$fileDelete->setLabel("delete");
+    	$fileDelete->setLabel("Delete");
     	
     	$this->addElement($fileDelete,'Delete');
     	
@@ -253,24 +294,28 @@ class Application_Form_Importer extends Zend_Form
     	
     	$fileProcess->setAttribs(array(
     			"onclick" => "return ConfirmFileProcess(this)",
-    			"disable" => true
+    			"disable" => true,
+    			"style" => "width:90px;"
     	)
     	);
-    	
+    	$fileProcess->removeDecorator('DtDdWrapper');
     	$this->addElement($fileProcess,'processFile');
     	
+    	    	
     	$view = $this->getView();
-    	$tableListMapper = new Application_Model_DbMapper();
-    	$tableList = $tableListMapper->tables;//$this->getView()->translate('dataBaseTables');
+    	$tableListMapper = new DataImportTable();
+		
+    	$tableList = $GLOBALS['adodb']['db']->MetaTables();
     	
     	$tableListElement = $view->ArrayView()->makeSelectList('tableList',$tableList);
     	$tableListElement->setAttribs(array(
-    			"onChange" => "document.forms[0].submit()"
+    			"onChange" => "tableListChanged()"
     	)
     	);
+    	$tableListElement->setValue("patient_data");
     	$this->addElement($tableListElement,'tableList');
     	
-    	$this->columnListSet = $tableListMapper->columnList($tableList[0]);
+    	$this->columnListSet = $tableListMapper->getDatabaseColumnListWithDateMarker("patient_data"," (".xl("Date").")");
     	
     	$txtQualifierBox = new Zend_Form_Element_Text("txtQualifierBox");
     	
@@ -278,7 +323,7 @@ class Application_Form_Importer extends Zend_Form
     	$txtQualifierBox->setAttribs(array(
     			"class" => "textbox",
     			"size" => 4,
-    			"onblur" => "SelectElement(this.value,this.attributes[\"id\"].value.replace(\"Box\",\"\"))"
+    			"onchange" => "SelectElement(this.value,this.attributes[\"id\"].value.replace(\"Box\",\"\"));configurationChanged();"
     			)
     	);
     	$this->clearDecorators($txtQualifierBox);
@@ -291,7 +336,7 @@ class Application_Form_Importer extends Zend_Form
     	$fieldDelimitBox->setAttribs(array(
     			"class" => "textbox",
     			"size" => 4,
-    			"onblur" => "SelectElement(this.value,this.attributes[\"id\"].value.replace(\"Box\",\"\"))"
+    			"onchange" => "SelectElement(this.value,this.attributes[\"id\"].value.replace(\"Box\",\"\"));configurationChanged();"
     	)
     	);
     	$this->clearDecorators($fieldDelimitBox);
@@ -300,14 +345,24 @@ class Application_Form_Importer extends Zend_Form
     	
     	$firstRowColumnHeading = new Zend_Form_Element_CheckBox("firstRowColumnHeading");
     	$this->clearDecorators($firstRowColumnHeading);
+    	$firstRowColumnHeading->setAttribs(array(
+    			"onchange"=>"configurationChanged()"
+    			));
     	$this->addElement($firstRowColumnHeading ,'firstRowColumnHeading');
     	
     	
     	//Hidden Table Data.
     	$hidTableData = new  Zend_Form_Element_Hidden('hidTableData');
+    	$this->clearDecorators($hidTableData);
+    	$hidTableData->removeDecorator('DtDdWrapper');
     	$this->addElement($hidTableData,'hidTableData');
     	
-
+    	//Hidden Postback Data (like actions).
+    	$hidPostBackAction = new  Zend_Form_Element_Hidden('hidPostBackAction');
+    	$this->clearDecorators($hidPostBackAction);
+    	$hidPostBackAction->removeDecorator('DtDdWrapper');
+    	$this->addElement($hidPostBackAction,'hidPostBackAction');
+    	
     	 
     	$this->addElement($this->createFileList("fileList"), "fileList");
     	
@@ -315,8 +370,62 @@ class Application_Form_Importer extends Zend_Form
     	
     	$this->lblOutput = "Please select a file to process.";
     	
+    	//Pattern Matching Checkboxes
+    	
+	    	$matchLName = new Zend_Form_Element_CheckBox("matchLName");
+	    	$this->clearDecorators($matchLName);
+	    	$this->addElement($matchLName ,'matchLName');
+    	 
+	    	$matchFName = new Zend_Form_Element_CheckBox("matchFName");
+	    	$this->clearDecorators($matchFName);
+	    	$this->addElement($matchFName ,'matchFName');
+    	
+    	
+	    	$matchMName = new Zend_Form_Element_CheckBox("matchMName");
+	    	$this->clearDecorators($matchMName );
+	    	$this->addElement($matchMName  ,'matchMName');
+    	
+    	
+	    	$matchSS = new Zend_Form_Element_CheckBox("matchSS");
+	    	$this->clearDecorators($matchSS);
+	    	$this->addElement($matchSS ,'matchSS');
+	    	
+    	
+	    	$matchDateOfBirth = new Zend_Form_Element_CheckBox("matchDateOfBirth");
+	    	$this->clearDecorators($matchDateOfBirth);
+	    	$this->addElement($matchDateOfBirth ,'matchDateOfBirth');
+	    	
+    	
+	    	$matchSex = new Zend_Form_Element_CheckBox("matchSex");
+	    	$this->clearDecorators($matchSex);
+	    	$this->addElement($matchSex ,'matchSex');
+	    	
+    	
+	    	$matchPatient_Id = new Zend_Form_Element_CheckBox("matchPatient_Id");
+	    	$this->clearDecorators($matchPatient_Id);
+	    	$this->addElement($matchPatient_Id ,'matchPatient_Id');
+	    	
+	    	//These might need to be changed to radio buttons.
+	    	$matchAddNew = new Zend_Form_Element_CheckBox("matchAddNew");
+	    	$this->clearDecorators($matchAddNew);
+	    	$this->addElement($matchAddNew ,'matchAddNew');
+	    	
+	    	
+	    	$this->addElement('hidden', 'matchMessage', array(
+	    			'description' => 'Add New patient for unmatched patients/Update Matched Patients.',
+	    			'ignore' => true,
+	    			'decorators' => array(
+	    					array('Description', array('escape'=>false, 'tag'=>'')),
+	    			),
+	    	));
+	    	
+	    	
+	    	
     	$dataSelect = $this->createDateFormatSelectList('dateSelect');
     	$dataSelect->removeDecorator('DtDdWrapper');
+    	$dataSelect->setAttribs(array(
+    			"onchange"=>"configurationChanged()"
+    	));
     	$this->addElement($dataSelect, 'dateSelect');
     	
     	
