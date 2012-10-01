@@ -24,7 +24,7 @@ class Zend_Helper_TableViewHelper extends Zend_View_Helper_Abstract
 	 */
 	public function generateTable($tableData, $listOfColumns, $columnChoice = NULL, $matchingValues = NULL) {
 	
-		$output =  "<table border=\"1\"><tr>";
+		$output =  "<table border=\"0\"><tr>";
 		$i = 0;
 		$lclTableData = $tableData->getData();
 		$optionArray = array("actions"  => array(),
