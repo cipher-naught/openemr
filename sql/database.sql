@@ -128,14 +128,13 @@ CREATE TABLE `billing` (
   `bill_date` datetime default NULL,
   `process_date` datetime default NULL,
   `process_file` varchar(255) default NULL,
-  `modifier` varchar(12) default NULL,
+  `modifier` varchar(5) default NULL,
   `units` tinyint(3) default NULL,
   `fee` decimal(12,2) default NULL,
   `justify` varchar(255) default NULL,
   `target` varchar(30) default NULL,
   `x12_partner_id` int(11) default NULL,
   `ndc_info` varchar(255) default NULL,
-  `notecodes` varchar(25) NOT NULL default '',
   PRIMARY KEY  (`id`),
   KEY `pid` (`pid`)
 ) ENGINE=MyISAM AUTO_INCREMENT=1 ;
@@ -557,44 +556,6 @@ INSERT INTO `config_seq` VALUES (0);
 
 -- --------------------------------------------------------
 
---
--- Table structure for table `dated_reminders`
---
-
-DROP TABLE IF EXISTS `dated_reminders`;
-CREATE TABLE `dated_reminders` (
-  `dr_id` int(11) NOT NULL AUTO_INCREMENT,
-  `dr_from_ID` int(11) NOT NULL,
-  `dr_message_text` varchar(160) NOT NULL,
-  `dr_message_sent_date` datetime NOT NULL,
-  `dr_message_due_date` date NOT NULL,
-  `pid` int(11) NOT NULL,
-  `message_priority` tinyint(1) NOT NULL,
-  `message_processed` tinyint(1) NOT NULL DEFAULT '0',
-  `processed_date` timestamp NULL DEFAULT NULL,
-  `dr_processed_by` int(11) NOT NULL,
-  PRIMARY KEY (`dr_id`),
-  KEY `dr_from_ID` (`dr_from_ID`,`dr_message_due_date`)
-) ENGINE=MyISAM AUTO_INCREMENT=1;
-
--- --------------------------------------------------------
-
---
--- Table structure for table `dated_reminders_link`
---
-
-DROP TABLE IF EXISTS `dated_reminders_link`;
-CREATE TABLE `dated_reminders_link` (           
-  `dr_link_id` int(11) NOT NULL AUTO_INCREMENT,
-  `dr_id` int(11) NOT NULL,
-  `to_id` int(11) NOT NULL,
-  PRIMARY KEY (`dr_link_id`),
-  KEY `to_id` (`to_id`),
-  KEY `dr_id` (`dr_id`)
-) ENGINE=MyISAM AUTO_INCREMENT=1;
-
--- --------------------------------------------------------
-
 -- 
 -- Table structure for table `documents`
 -- 
@@ -774,8 +735,7 @@ CREATE TABLE `drugs` (
   `name` varchar(255) NOT NULL DEFAULT '',
   `ndc_number` varchar(20) NOT NULL DEFAULT '',
   `on_order` int(11) NOT NULL default '0',
-  `reorder_point` float NOT NULL DEFAULT 0.0,
-  `max_level` float NOT NULL DEFAULT 0.0,
+  `reorder_point` int(11) NOT NULL default '0',
   `last_notify` date NOT NULL default '0000-00-00',
   `reactions` text,
   `form` int(3) NOT NULL default '0',
@@ -950,8 +910,6 @@ CREATE TABLE `facility` (
   `postal_code` varchar(11) default NULL,
   `country_code` varchar(10) default NULL,
   `federal_ein` varchar(15) default NULL,
-  `website` varchar(255) default NULL,
-  `email` varchar(255) default NULL,
   `service_location` tinyint(1) NOT NULL default '1',
   `billing_location` tinyint(1) NOT NULL default '0',
   `accepts_assignment` tinyint(1) NOT NULL default '0',
@@ -970,7 +928,7 @@ CREATE TABLE `facility` (
 -- Dumping data for table `facility`
 -- 
 
-INSERT INTO `facility` VALUES (3, 'Your Clinic Name Here', '000-000-0000', '000-000-0000', '', '', '', '', '', '', NULL, NULL, 1, 1, 0, NULL, '', '', '', '', '','#99FFFF','0');
+INSERT INTO `facility` VALUES (3, 'Your Clinic Name Here', '000-000-0000', '000-000-0000', '', '', '', '', '', '', 1, 1, 0, NULL, '', '', '', '', '','#99FFFF','0');
 
 -- --------------------------------------------------------
 
@@ -1418,8 +1376,7 @@ CREATE TABLE `form_vitals` (
   `waist_circ` float(5,2) default '0.00',
   `head_circ` float(4,2) default '0.00',
   `oxygen_saturation` float(5,2) default '0.00',
-  PRIMARY KEY  (`id`),
-  KEY `pid` (`pid`)
+  PRIMARY KEY  (`id`)
 ) ENGINE=MyISAM AUTO_INCREMENT=1 ;
 
 -- --------------------------------------------------------
@@ -1441,8 +1398,7 @@ CREATE TABLE `forms` (
   `authorized` tinyint(4) default NULL,
   `deleted` tinyint(4) DEFAULT '0' NOT NULL COMMENT 'flag indicates form has been deleted',
   `formdir` longtext,
-  PRIMARY KEY  (`id`),
-  KEY `pid` (`pid`)
+  PRIMARY KEY  (`id`)
 ) ENGINE=MyISAM AUTO_INCREMENT=1 ;
 
 -- --------------------------------------------------------
@@ -1941,8 +1897,7 @@ CREATE TABLE `immunizations` (
   `update_date` timestamp NOT NULL,
   `created_by` bigint(20) default NULL,
   `updated_by` bigint(20) default NULL,
-  PRIMARY KEY  (`id`),
-  KEY `patient_id` (`patient_id`)
+  PRIMARY KEY  (`id`)
 ) ENGINE=MyISAM AUTO_INCREMENT=1 ;
 
 -- --------------------------------------------------------
@@ -2001,7 +1956,6 @@ CREATE TABLE `insurance_data` (
   `pid` bigint(20) NOT NULL default '0',
   `subscriber_sex` varchar(25) default NULL,
   `accept_assignment` varchar(5) NOT NULL DEFAULT 'TRUE',
-  `policy_type` varchar(25) NOT NULL default '',
   PRIMARY KEY  (`id`),
   UNIQUE KEY `pid_type_date` (`pid`,`type`,`date`)
 ) ENGINE=MyISAM AUTO_INCREMENT=1 ;
@@ -2829,7 +2783,6 @@ INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES (
 INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('payment_method', 'check_payment', 'Check Payment', 10, 0);
 INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('payment_method', 'credit_card', 'Credit Card', 30, 0);
 INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('payment_method', 'electronic', 'Electronic', 40, 0);
-insert into `list_options` (`list_id`, `option_id`, `title`, `seq`, `is_default`, `option_value`, `mapping`, `notes`) values('payment_method','authorize_net','Authorize.net','60','0','0','','');
 
 INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('lists'   ,'payment_sort_by','Payment Sort By', 1,0);
 INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('payment_sort_by', 'check_date', 'Check Date', 20, 0);
@@ -3261,15 +3214,6 @@ INSERT INTO `list_options` (`list_id`, `option_id`, `title`, `seq`, `is_default`
 INSERT INTO `list_options` (`list_id`, `option_id`, `title`, `seq`, `is_default`, `option_value`, `mapping`, `notes`) VALUES ('msp_remit_codes', 'D23', 'D23', 215, 0, 0, '', 'This dual eligible patient is covered by Medicare Part D per Medicare Retro-Eligibility. At least one Remark Code must be provided (may be comprised of either the NCPDP Reject Reason Code, or Remittance Advice Remark Code that is not an ALERT.)');
 INSERT INTO `list_options` (`list_id`, `option_id`, `title`, `seq`, `is_default`, `option_value`, `mapping`, `notes`) VALUES ('msp_remit_codes', 'W1', 'W1', 216, 0, 0, '', 'Workers'' compensation jurisdictional fee schedule adjustment. Note: If adjustment is at the Claim Level, the payer must send and the provider should refer to the 835 Class of Contract Code Identification Segment (Loop 2100 Other Claim Related Information ');
 INSERT INTO `list_options` (`list_id`, `option_id`, `title`, `seq`, `is_default`, `option_value`, `mapping`, `notes`) VALUES ('msp_remit_codes', 'W2', 'W2', 217, 0, 0, '', 'Payment reduced or denied based on workers'' compensation jurisdictional regulations or payment policies, use only if no other code is applicable. Note: If adjustment is at the Claim Level, the payer must send and the provider should refer to the 835 Insur');
-
-INSERT INTO `list_options` (`list_id`, `option_id`, `title`, `seq`) VALUES ('lists','nation_notes_replace_buttons','Nation Notes Replace Buttons',1);
-INSERT INTO `list_options` (`list_id`, `option_id`, `title`, `seq`) VALUES ('nation_notes_replace_buttons','Yes','Yes',10);
-INSERT INTO `list_options` (`list_id`, `option_id`, `title`, `seq`) VALUES ('nation_notes_replace_buttons','No','No',20);
-INSERT INTO `list_options` (`list_id`, `option_id`, `title`, `seq`) VALUES ('nation_notes_replace_buttons','Normal','Normal',30);
-INSERT INTO `list_options` (`list_id`, `option_id`, `title`, `seq`) VALUES ('nation_notes_replace_buttons','Abnormal','Abnormal',40);
-insert into `list_options` (`list_id`, `option_id`, `title`, `seq`, `is_default`, `option_value`, `mapping`, `notes`) values('lists','payment_gateways','Payment Gateways','297','1','0','','');
-insert into `list_options` (`list_id`, `option_id`, `title`, `seq`, `is_default`, `option_value`, `mapping`, `notes`) values('payment_gateways','authorize_net','Authorize.net','1','0','0','','');
-
 -- --------------------------------------------------------
 
 -- 
@@ -3305,9 +3249,7 @@ CREATE TABLE `lists` (
   `external_allergyid` INT(11) DEFAULT NULL,
   `erx_source` ENUM('0','1') DEFAULT '0' NOT NULL  COMMENT '0-OpenEMR 1-External',
   `erx_uploaded` ENUM('0','1') DEFAULT '0' NOT NULL  COMMENT '0-Pending NewCrop upload 1-Uploaded TO NewCrop',
-  PRIMARY KEY  (`id`),
-  KEY `pid` (`pid`),
-  KEY `type` (`type`)
+  PRIMARY KEY  (`id`)
 ) ENGINE=MyISAM AUTO_INCREMENT=1 ;
 
 -- --------------------------------------------------------
@@ -3755,7 +3697,6 @@ CREATE TABLE  `patient_access_offsite` (
   `portal_username` varchar(100) NOT NULL,
   `portal_pwd` varchar(100) NOT NULL,
   `portal_pwd_status` tinyint(4) DEFAULT '1' COMMENT '0=>Password Created Through Demographics by The provider or staff. Patient Should Change it at first time it.1=>Pwd updated or created by patient itself',
-  `authorize_net_id` VARCHAR(20) COMMENT 'authorize.net profile id',
   PRIMARY KEY (`id`),
   UNIQUE KEY `pid` (`pid`)
 ) ENGINE=MyISAM AUTO_INCREMENT=1;
@@ -3780,20 +3721,6 @@ CREATE TABLE `payments` (
   PRIMARY KEY  (`id`),
   KEY `pid` (`pid`)
 ) ENGINE=MyISAM AUTO_INCREMENT=1 ;
-
--- --------------------------------------------------------
-
---
--- Table structure for table `payment_gateway_details`
---
-CREATE TABLE `payment_gateway_details` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `service_name` varchar(100) DEFAULT NULL,
-  `login_id` varchar(255) DEFAULT NULL,
-  `transaction_key` varchar(255) DEFAULT NULL,
-  `md5` varchar(255) DEFAULT NULL,
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB;
 
 -- --------------------------------------------------------
 
@@ -3975,8 +3902,7 @@ CREATE TABLE `pnotes` (
   `assigned_to` varchar(255) default NULL,
   `deleted` tinyint(4) default 0 COMMENT 'flag indicates note is deleted',
   `message_status` VARCHAR(20) NOT NULL DEFAULT 'New',
-  PRIMARY KEY  (`id`),
-  KEY `pid` (`pid`)
+  PRIMARY KEY  (`id`)
 ) ENGINE=MyISAM AUTO_INCREMENT=1 ;
 
 -- --------------------------------------------------------
@@ -4019,9 +3945,7 @@ CREATE TABLE `prescriptions` (
   `prescriptionguid` VARCHAR(50) DEFAULT NULL,
   `erx_source` TINYINT(4) NOT NULL DEFAULT '0' COMMENT '0-OpenEMR 1-External',
   `erx_uploaded` TINYINT(4) NOT NULL DEFAULT '0' COMMENT '0-Pending NewCrop upload 1-Uploaded to NewCrop',
-  `drug_info_erx` TEXT DEFAULT NULL,
-  PRIMARY KEY  (`id`),
-  KEY `patient_id` (`patient_id`)
+  PRIMARY KEY  (`id`)
 ) ENGINE=MyISAM AUTO_INCREMENT=1 ;
 
 -- --------------------------------------------------------
@@ -4736,8 +4660,7 @@ CREATE TABLE `transactions` (
   `reply_recommend`         text         NOT NULL DEFAULT '',
   `reply_rx_refer`          text         NOT NULL DEFAULT '',
   `reply_related_code`      varchar(255) NOT NULL DEFAULT '',
-  PRIMARY KEY  (`id`),
-  KEY `pid` (`pid`)
+  PRIMARY KEY  (`id`)
 ) ENGINE=MyISAM AUTO_INCREMENT=1 ;
 
 -- --------------------------------------------------------
@@ -4862,7 +4785,6 @@ CREATE TABLE `x12_partners` (
   `x12_isa15` char(1)     NOT NULL DEFAULT 'P',
   `x12_gs02`  varchar(15) NOT NULL DEFAULT '',
   `x12_per06` varchar(80) NOT NULL DEFAULT '',
-  `x12_gs03`  varchar(15) NOT NULL DEFAULT '',
   PRIMARY KEY  (`id`)
 ) ENGINE=MyISAM;
 
@@ -5055,8 +4977,7 @@ CREATE TABLE `procedure_order` (
   `activity`               tinyint(1)   NOT NULL DEFAULT 1  COMMENT '0 if deleted',
   `control_id`             bigint(20)   NOT NULL            COMMENT 'This is the CONTROL ID that is sent back from lab',
   PRIMARY KEY (`procedure_order_id`),
-  KEY datepid (date_ordered, patient_id),
-  KEY `patient_id` (`patient_id`)
+  KEY datepid (date_ordered, patient_id)
 ) ENGINE=MyISAM;
 
 CREATE TABLE `procedure_report` (
@@ -5107,18 +5028,12 @@ CREATE TABLE code_types (
   ct_rel  tinyint(1)  NOT NULL default 0 COMMENT '1 if can relate to other code types',
   ct_nofs tinyint(1)  NOT NULL default 0 COMMENT '1 if to be hidden in the fee sheet',
   ct_diag tinyint(1)  NOT NULL default 0 COMMENT '1 if this is a diagnosis type',
-  ct_active tinyint(1) NOT NULL default 1 COMMENT '1 if this is active',
-  ct_label varchar(31) NOT NULL default '' COMMENT 'label of this code type',
-  ct_external tinyint(1) NOT NULL default 0 COMMENT '0 if stored codes in codes tables, 1 or greater if codes stored in external tables',
   PRIMARY KEY (ct_key)
 ) ENGINE=MyISAM;
-INSERT INTO code_types (ct_key, ct_id, ct_seq, ct_mod, ct_just, ct_fee, ct_rel, ct_nofs, ct_diag, ct_active, ct_label, ct_external ) VALUES ('ICD9' , 2, 1, 2, ''    , 0, 0, 0, 1, 1, 'ICD9', 0);
-INSERT INTO code_types (ct_key, ct_id, ct_seq, ct_mod, ct_just, ct_fee, ct_rel, ct_nofs, ct_diag, ct_active, ct_label, ct_external ) VALUES ('CPT4' , 1, 2, 12, 'ICD9', 1, 0, 0, 0, 1, 'CPT4', 0);
-INSERT INTO code_types (ct_key, ct_id, ct_seq, ct_mod, ct_just, ct_fee, ct_rel, ct_nofs, ct_diag, ct_active, ct_label, ct_external ) VALUES ('HCPCS', 3, 3, 12, 'ICD9', 1, 0, 0, 0, 1, 'HCPCS', 0);
-INSERT INTO code_types (ct_key, ct_id, ct_seq, ct_mod, ct_just, ct_fee, ct_rel, ct_nofs, ct_diag, ct_active, ct_label, ct_external ) VALUES ('CVX'  , 100, 100, 0, '', 0, 0, 1, 0, 1, 'CVX', 0);
-INSERT INTO code_types (ct_key, ct_id, ct_seq, ct_mod, ct_just, ct_fee, ct_rel, ct_nofs, ct_diag, ct_active, ct_label, ct_external ) VALUES ('DSMIV' , 101, 101, 2, '', 0, 0, 0, 1, 0, 'DSMIV', 0);
-INSERT INTO code_types (ct_key, ct_id, ct_seq, ct_mod, ct_just, ct_fee, ct_rel, ct_nofs, ct_diag, ct_active, ct_label, ct_external ) VALUES ('ICD10' , 102, 102, 2, '', 0, 0, 0, 1, 0, 'ICD10', 1);
-INSERT INTO code_types (ct_key, ct_id, ct_seq, ct_mod, ct_just, ct_fee, ct_rel, ct_nofs, ct_diag, ct_active, ct_label, ct_external ) VALUES ('SNOMED' , 103, 103, 2, '', 0, 0, 0, 1, 0, 'SNOMED', 2);
+INSERT INTO code_types (ct_key, ct_id, ct_seq, ct_mod, ct_just, ct_fee, ct_rel, ct_nofs, ct_diag ) VALUES ('ICD9' , 2, 1, 2, ''    , 0, 0, 0, 1);
+INSERT INTO code_types (ct_key, ct_id, ct_seq, ct_mod, ct_just, ct_fee, ct_rel, ct_nofs, ct_diag ) VALUES ('CPT4' , 1, 2, 2, 'ICD9', 1, 0, 0, 0);
+INSERT INTO code_types (ct_key, ct_id, ct_seq, ct_mod, ct_just, ct_fee, ct_rel, ct_nofs, ct_diag ) VALUES ('HCPCS', 3, 3, 2, 'ICD9', 1, 0, 0, 0);
+INSERT INTO code_types (ct_key, ct_id, ct_seq, ct_mod, ct_just, ct_fee, ct_rel, ct_nofs, ct_diag ) VALUES ('CVX'  , 100, 100, 0, '', 0, 0, 1, 0);
 
 INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('lists', 'code_types', 'Code Types', 1);
 
@@ -5165,19 +5080,17 @@ CREATE TABLE `extended_log` (
   `recipient` varchar(255) default NULL,
   `description` longtext,
   `patient_id` bigint(20) default NULL,
-  PRIMARY KEY  (`id`),
-  KEY `patient_id` (`patient_id`)
+  PRIMARY KEY  (`id`)
 ) ENGINE=MyISAM AUTO_INCREMENT=1 ;
 
 CREATE TABLE version (
   v_major    int(11)     NOT NULL DEFAULT 0,
   v_minor    int(11)     NOT NULL DEFAULT 0,
   v_patch    int(11)     NOT NULL DEFAULT 0,
-  v_realpatch int(11)    NOT NULL DEFAULT 0,
   v_tag      varchar(31) NOT NULL DEFAULT '',
   v_database int(11)     NOT NULL DEFAULT 0
 ) ENGINE=MyISAM;
-INSERT INTO version (v_major, v_minor, v_patch, v_realpatch, v_tag, v_database) VALUES (0, 0, 0, 0, '', 0);
+INSERT INTO version (v_major, v_minor, v_patch, v_tag, v_database) VALUES (0, 0, 0, '', 0);
 -- --------------------------------------------------------
 
 --
@@ -5216,12 +5129,3 @@ CREATE TABLE `template_users` (
   PRIMARY KEY (`tu_id`),
   UNIQUE KEY `templateuser` (`tu_user_id`,`tu_template_id`)
 ) ENGINE=MyISAM AUTO_INCREMENT=1;
-
-CREATE TABLE `product_warehouse` (
-  `pw_drug_id`   int(11) NOT NULL,
-  `pw_warehouse` varchar(31) NOT NULL,
-  `pw_min_level` float       DEFAULT 0,
-  `pw_max_level` float       DEFAULT 0,
-  PRIMARY KEY  (`pw_drug_id`,`pw_warehouse`)
-) ENGINE=MyISAM;
-

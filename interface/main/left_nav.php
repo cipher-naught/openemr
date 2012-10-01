@@ -101,7 +101,7 @@
   'ros' => array(xl('Roster')    , 0, 'reports/players_report.php?embed=1'),
   'cal' => array(xl('Calendar')  , 0, 'main/main_info.php'),
   'app' => array(xl('Portal Activity')  , 0, '../myportal/index.php'),
-  'msg' => array(xl('Messages')  , 0, 'main/messages/messages.php?form_active=1'),
+  'msg' => array(xl('Messages')  , 0, 'main/messages/messages.php'),
   'pwd' => array(xl('Password')  , 0, 'usergroup/user_info.php'),
   'prf' => array(xl('Preferences')  , 0, 'super/edit_globals.php?mode=user'),
   'adm' => array(xl('Admin')     , 0, 'usergroup/admin_frameset.php'),
@@ -352,9 +352,9 @@ function genFindBlock() {
 }
 </style>
 
-<link rel="stylesheet" href="../../library/js/jquery.treeview-1.4.1/jquery.treeview.css" />
-<script src="../../library/js/jquery-1.6.4.min.js" type="text/javascript"></script>
-<script src="../../library/js/jquery.treeview-1.4.1/jquery.treeview.js" type="text/javascript"></script>
+<link rel="stylesheet" href="../../library/js/jquery.treeview-1.3/jquery.treeview.css" />
+<script src="../../library/js/jquery-1.2.2.min.js" type="text/javascript"></script>
+<script src="../../library/js/jquery.treeview-1.3/jquery.treeview.min.js" type="text/javascript"></script>
 
 <script type="text/javascript" src="../../library/dialog.js"></script>
 
@@ -550,7 +550,7 @@ function genFindBlock() {
 
 function goHome() {
     top.frames['RTop'].location='<?php echo $GLOBALS['default_top_pane']?>';
-    top.frames['RBot'].location='messages/messages.php?form_active=1';
+    top.frames['RBot'].location='messages/messages.php';
 }
 
  // Reference to the search.php window.
@@ -1235,7 +1235,6 @@ if (!empty($reg)) {
           <?php if (acl_check('admin', 'users'   )) genMiscLink('RTop','adm','0',xl('Certificates'),'usergroup/ssl_certificates_admin.php'); ?>
           <?php if (acl_check('admin', 'super'   )) genMiscLink('RTop','adm','0',xl('RxNorm'),'../interface/code_systems/standard_tables_manage.php?mode=rxnorm'); ?>
           <?php if (acl_check('admin', 'super'   )) genMiscLink('RTop','adm','0',xl('SNOMED'),'../interface/code_systems/standard_tables_manage.php?mode=snomed'); ?>
-          <?php if (acl_check('admin', 'super'   ) && ((!isset($GLOBALS['enable_Data_Import_in_left_menu']) || $GLOBALS['enable_Data_Import_in_left_menu'] == 1))) genMiscLink('RTop','adm','0',xl('Data Import'),'../contrib/dataImporter/public/importer/form'); ?>
         </ul>
       </li>
     </ul>
@@ -1328,7 +1327,7 @@ if (!empty($reg)) {
       <li><a class="collapsed_lv2"><span><?php xl('Blank Forms','e') ?></span></a>
         <ul>
           <?php genPopLink(xl('Demographics'),'../patient_file/summary/demographics_print.php'); ?>
-          <?php genPopLink(xl('Superbill/Fee Sheet'),'../patient_file/printed_fee_sheet.php'); ?>
+          <?php genPopLink(xl('Fee Sheet'),'../patient_file/printed_fee_sheet.php'); ?>
           <?php genPopLink(xl('Referral'),'../patient_file/transaction/print_referral.php'); ?>
 <?php
   $lres = sqlStatement("SELECT * FROM list_options " .
