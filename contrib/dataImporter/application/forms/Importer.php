@@ -343,7 +343,7 @@ class Application_Form_Importer extends Zend_Form
     	$fieldDelimitBox->setValue($fieldDelimit->getValue());
     	$this->addElement($fieldDelimitBox,'fieldDelimitBox');
     	
-    	$firstRowColumnHeading = new Zend_Form_Element_CheckBox("firstRowColumnHeading");
+    	$firstRowColumnHeading = new Zend_Form_Element_Checkbox("firstRowColumnHeading");
     	$this->clearDecorators($firstRowColumnHeading);
     	$firstRowColumnHeading->setAttribs(array(
     			"onchange"=>"configurationChanged()"
@@ -372,41 +372,41 @@ class Application_Form_Importer extends Zend_Form
     	
     	//Pattern Matching Checkboxes
     	
-	    	$matchLName = new Zend_Form_Element_CheckBox("matchLName");
+	    	$matchLName = new Zend_Form_Element_Checkbox("matchLName");
 	    	$this->clearDecorators($matchLName);
 	    	$this->addElement($matchLName ,'matchLName');
     	 
-	    	$matchFName = new Zend_Form_Element_CheckBox("matchFName");
+	    	$matchFName = new Zend_Form_Element_Checkbox("matchFName");
 	    	$this->clearDecorators($matchFName);
 	    	$this->addElement($matchFName ,'matchFName');
     	
     	
-	    	$matchMName = new Zend_Form_Element_CheckBox("matchMName");
+	    	$matchMName = new Zend_Form_Element_Checkbox("matchMName");
 	    	$this->clearDecorators($matchMName );
 	    	$this->addElement($matchMName  ,'matchMName');
     	
     	
-	    	$matchSS = new Zend_Form_Element_CheckBox("matchSS");
+	    	$matchSS = new Zend_Form_Element_Checkbox("matchSS");
 	    	$this->clearDecorators($matchSS);
 	    	$this->addElement($matchSS ,'matchSS');
 	    	
     	
-	    	$matchDateOfBirth = new Zend_Form_Element_CheckBox("matchDateOfBirth");
+	    	$matchDateOfBirth = new Zend_Form_Element_Checkbox("matchDateOfBirth");
 	    	$this->clearDecorators($matchDateOfBirth);
 	    	$this->addElement($matchDateOfBirth ,'matchDateOfBirth');
 	    	
     	
-	    	$matchSex = new Zend_Form_Element_CheckBox("matchSex");
+	    	$matchSex = new Zend_Form_Element_Checkbox("matchSex");
 	    	$this->clearDecorators($matchSex);
 	    	$this->addElement($matchSex ,'matchSex');
 	    	
     	
-	    	$matchPatient_Id = new Zend_Form_Element_CheckBox("matchPatient_Id");
+	    	$matchPatient_Id = new Zend_Form_Element_Checkbox("matchPatient_Id");
 	    	$this->clearDecorators($matchPatient_Id);
 	    	$this->addElement($matchPatient_Id ,'matchPatient_Id');
 	    	
 	    	//These might need to be changed to radio buttons.
-	    	$matchAddNew = new Zend_Form_Element_CheckBox("matchAddNew");
+	    	$matchAddNew = new Zend_Form_Element_Checkbox("matchAddNew");
 	    	$this->clearDecorators($matchAddNew);
 	    	$this->addElement($matchAddNew ,'matchAddNew');
 	    	
