@@ -17,13 +17,12 @@ require_once("$srcdir/options.inc.php");
 $CPR = 4; // cells per row
 
 // Check authorization.
-$thisauth = acl_check('patients', 'med');
-if ($thisauth) {
+if (acl_check('patients','med')) {
   $tmp = getPatientData($pid, "squad");
   if ($tmp['squad'] && ! acl_check('squads', $tmp['squad']))
-   $thisauth = 0;
+   die(htmlspecialchars(xl("Not authorized for this squad."),ENT_NOQUOTES));
 }
-if ($thisauth != 'write' && $thisauth != 'addonly')
+if ( !acl_check('patients','med','',array('write','addonly') ))
   die(htmlspecialchars(xl("Not authorized"),ENT_NOQUOTES));
 ?>
 <html>
@@ -93,7 +92,7 @@ function submit_history() {
 //function for selecting the smoking status in radio button based on the selection of drop down list.
 function radioChange(rbutton)
 {
-     if (rbutton == 1 || rbutton == 2)
+     if (rbutton == 1 || rbutton == 2 || rbutton == 15 || rbutton == 16)
      {
      document.getElementById('radio_tobacco[current]').checked = true;
      }

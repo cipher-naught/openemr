@@ -23,7 +23,7 @@
 <html>
 <head>
 <?php html_header_show();?>
-<link rel=stylesheet href="<?echo $css_header;?>" type="text/css">
+<link rel=stylesheet href="<?php echo $css_header;?>" type="text/css">
 </head>
 
 <body bgcolor="#ffffff" topmargin=0 rightmargin=0 leftmargin=2 bottommargin=0 marginwidth=2 marginheight=0>
@@ -57,10 +57,10 @@
   echo "<img src='$practice_logo' align='left'>\n";
  }
 ?>
-<h2><?=$facility['name']?></h2>
-<?=$facility['street']?><br>
-<?=$facility['city']?>, <?=$facility['state']?> <?=$facility['postal_code']?><br clear='all'>
-<?=$facility['phone']?><br>
+<h2><?php echo $facility['name']?></h2>
+<?php echo $facility['street']?><br>
+<?php echo $facility['city']?>, <?php echo $facility['state']?> <?php echo $facility['postal_code']?><br clear='all'>
+<?php echo $facility['phone']?><br>
 </p>
 
 <a href="javascript:window.close();"><font class=title><?print $titleres{"fname"} . " " . $titleres{"lname"};?></font></a><br>
@@ -250,6 +250,9 @@
 
       // This requires ImageMagick to be installed.
       $from_file = $d->get_url_filepath();
+      if($d->get_storagemethod()==1 ){
+	$from_file = $d->get_couch_url($pid,$encounter);
+      }
       $to_file = substr($from_file, 0, strrpos($from_file, '.')) . '_converted.jpg';
       if (! is_file($to_file)) exec("convert -density 200 '$from_file' -append -resize 850 '$to_file'");
       if (is_file($to_file)) {
@@ -261,7 +264,9 @@
         xl('cannot be converted to JPEG. Perhaps ImageMagick is not installed?') .
         "<br><br>";
       }
-
+      if($d->get_storagemethod()==1 ){
+       unlink($from_file);
+      }
      }
     }
    }

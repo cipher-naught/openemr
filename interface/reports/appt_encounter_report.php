@@ -28,6 +28,7 @@ require_once("../globals.php");
 require_once("$srcdir/patient.inc");
 require_once("$srcdir/formatting.inc.php");
 require_once("../../custom/code_types.inc.php");
+require_once("$srcdir/billing.inc");
 
  $errmsg  = "";
  $alertmsg = ''; // not used yet but maybe later
@@ -94,8 +95,8 @@ function postError($msg) {
    "CONCAT( u.lname, ', ', u.fname ) AS docname " .
    "FROM openemr_postcalendar_events AS e " .
    "LEFT OUTER JOIN form_encounter AS fe " .
-   "ON LEFT(fe.date, 10) = e.pc_eventDate AND fe.pid = e.pc_pid " .
-   "LEFT OUTER JOIN forms AS f ON f.encounter = fe.encounter AND f.formdir = 'newpatient' " .
+   "ON fe.date = e.pc_eventDate AND fe.pid = e.pc_pid " .
+   "LEFT OUTER JOIN forms AS f ON f.pid = fe.pid AND f.encounter = fe.encounter AND f.formdir = 'newpatient' " .
    "LEFT OUTER JOIN patient_data AS p ON p.pid = e.pc_pid " .
    // "LEFT OUTER JOIN users AS u ON BINARY u.username = BINARY f.user WHERE ";
    "LEFT OUTER JOIN users AS u ON u.id = fe.provider_id WHERE ";
@@ -118,10 +119,10 @@ function postError($msg) {
    "CONCAT( u.lname, ', ', u.fname ) AS docname " .
    "FROM form_encounter AS fe " .
    "LEFT OUTER JOIN openemr_postcalendar_events AS e " .
-   "ON LEFT(fe.date, 10) = e.pc_eventDate AND fe.pid = e.pc_pid AND " .
+   "ON fe.date = e.pc_eventDate AND fe.pid = e.pc_pid AND " .
    // "( e.pc_catid = 5 OR e.pc_catid = 9 OR e.pc_catid = 10 ) " .
    "e.pc_pid != '' AND e.pc_apptstatus != '?' " .
-   "LEFT OUTER JOIN forms AS f ON f.encounter = fe.encounter AND f.formdir = 'newpatient' " .
+   "LEFT OUTER JOIN forms AS f ON f.pid = fe.pid AND f.encounter = fe.encounter AND f.formdir = 'newpatient' " .
    "LEFT OUTER JOIN patient_data AS p ON p.pid = fe.pid " .
    // "LEFT OUTER JOIN users AS u ON BINARY u.username = BINARY f.user WHERE ";
    "LEFT OUTER JOIN users AS u ON u.id = fe.provider_id WHERE ";
@@ -330,10 +331,7 @@ function postError($msg) {
     if ($code_types[$code_type]['just']) {
      if (! $brow['justify']) postError(xl('Needs Justify'));
     }
-    if ($code_type == 'COPAY') {
-     $copays -= $brow['fee'];
-     if ($brow['fee'] >= 0) postError(xl('Copay not positive'));
-    } else if ($code_types[$code_type]['fee']) {
+    if ($code_types[$code_type]['fee']) {
      $charges += $brow['fee'];
      if ($brow['fee'] == 0 && !$GLOBALS['ippf_specific']) postError(xl('Missing Fee'));
     } else {
@@ -364,6 +362,8 @@ function postError($msg) {
     } // End IPPF stuff
 
    } // end while
+   
+   $copays -= getPatientCopay($patient_id,$encounter);
 
    // The following is removed, perhaps temporarily, because gcac reporting
    // no longer depends on gcac issues.  -- Rod 2009-08-11

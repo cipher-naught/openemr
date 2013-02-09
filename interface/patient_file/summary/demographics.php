@@ -118,6 +118,16 @@ function image_widget($doc_id,$doc_catg)
 $tmp = sqlQuery("SELECT count(*) AS count FROM registry WHERE " .
   "directory = 'vitals' AND state = 1");
 $vitals_is_registered = $tmp['count'];
+
+// Get patient/employer/insurance information.
+//
+$result  = getPatientData($pid, "*, DATE_FORMAT(DOB,'%Y-%m-%d') as DOB_YMD");
+$result2 = getEmployerData($pid);
+$result3 = getInsuranceData($pid, "primary", "copay, provider, DATE_FORMAT(`date`,'%Y-%m-%d') as effdate");
+$insco_name = "";
+if ($result3['provider']) {   // Use provider in case there is an ins record w/ unassigned insco
+  $insco_name = getInsuranceProvider($result3['provider']);
+}
 ?>
 <html>
 
@@ -135,13 +145,6 @@ $vitals_is_registered = $tmp['count'];
 <script type="text/javascript" src="../../../library/js/common.js"></script>
 <script type="text/javascript" src="../../../library/js/fancybox/jquery.fancybox-1.2.6.js"></script>
 <script type="text/javascript" language="JavaScript">
-//Visolve - sync the radio buttons - Start
-if((top.window.parent) && (parent.window)){
-        var wname = top.window.parent.left_nav;
-        wname.syncRadios();
-        wname.setRadio(parent.window.name, "dem");
-}
-//Visolve - sync the radio buttons - End
 
  var mypcc = '<?php echo htmlspecialchars($GLOBALS['phone_country_code'],ENT_QUOTES); ?>';
 
@@ -371,7 +374,7 @@ $(document).ready(function(){
   $(".small_modal").fancybox( {
 	'overlayOpacity' : 0.0,
 	'showCloseButton' : true,
-	'frameHeight' : 180,
+	'frameHeight' : 200,
 	'frameWidth' : 380,
             'centerOnScroll' : false
   });
@@ -387,6 +390,49 @@ $(document).ready(function(){
     }).trigger('click');
   <?php } ?>
 
+});
+
+// JavaScript stuff to do when a new patient is set.
+//
+function setMyPatient() {
+<?php if ($GLOBALS['concurrent_layout']) { ?>
+ // Avoid race conditions with loading of the left_nav or Title frame.
+ if (!parent.allFramesLoaded()) {
+  setTimeout("setMyPatient()", 500);
+  return;
+ }
+<?php if (isset($_GET['set_pid'])) { ?>
+ parent.left_nav.setPatient(<?php echo "'" . htmlspecialchars(($result['fname']) . " " . ($result['lname']),ENT_QUOTES) .
+   "'," . htmlspecialchars($pid,ENT_QUOTES) . ",'" . htmlspecialchars(($result['pubpid']),ENT_QUOTES) .
+   "','', ' " . htmlspecialchars(xl('DOB') . ": " . oeFormatShortDate($result['DOB_YMD']) . " " . xl('Age') . ": " . getPatientAge($result['DOB_YMD']), ENT_QUOTES) . "'"; ?>);
+ var EncounterDateArray = new Array;
+ var CalendarCategoryArray = new Array;
+ var EncounterIdArray = new Array;
+ var Count = 0;
+<?php
+  //Encounter details are stored to javacript as array.
+  $result4 = sqlStatement("SELECT fe.encounter,fe.date,openemr_postcalendar_categories.pc_catname FROM form_encounter AS fe ".
+    " left join openemr_postcalendar_categories on fe.pc_catid=openemr_postcalendar_categories.pc_catid  WHERE fe.pid = ? order by fe.date desc", array($pid));
+  if(sqlNumRows($result4)>0) {
+    while($rowresult4 = sqlFetchArray($result4)) {
+?>
+ EncounterIdArray[Count] = '<?php echo htmlspecialchars($rowresult4['encounter'], ENT_QUOTES); ?>';
+ EncounterDateArray[Count] = '<?php echo htmlspecialchars(oeFormatShortDate(date("Y-m-d", strtotime($rowresult4['date']))), ENT_QUOTES); ?>';
+ CalendarCategoryArray[Count] = '<?php echo htmlspecialchars(xl_appt_category($rowresult4['pc_catname']), ENT_QUOTES); ?>';
+ Count++;
+<?php
+    }
+  }
+?>
+ parent.left_nav.setPatientEncounter(EncounterIdArray,EncounterDateArray,CalendarCategoryArray);
+<?php } // end setting new pid ?>
+ parent.left_nav.setRadio(window.name, 'dem');
+ parent.left_nav.syncRadios();
+<?php } // end concurrent layout ?>
+}
+
+$(window).load(function() {
+ setMyPatient();
 });
 
 </script>
@@ -405,28 +451,17 @@ $(document).ready(function(){
 <a href='../reminder/active_reminder_popup.php' id='reminder_popup_link' style='visibility: false;' class='iframe' onclick='top.restoreSession()'></a>
 
 <?php
- $result = getPatientData($pid, "*, DATE_FORMAT(DOB,'%Y-%m-%d') as DOB_YMD");
- $result2 = getEmployerData($pid);
- $result3 = getInsuranceData($pid, "primary", "copay, provider, DATE_FORMAT(`date`,'%Y-%m-%d') as effdate");
- $insco_name = "";
-
- if ($result3['provider']) {   // Use provider in case there is an ins record w/ unassigned insco
-     $insco_name = getInsuranceProvider($result3['provider']);
- }
-
  $thisauth = acl_check('patients', 'demo');
  if ($thisauth) {
   if ($result['squad'] && ! acl_check('squads', $result['squad']))
    $thisauth = 0;
  }
-
  if (!$thisauth) {
   echo "<p>(" . htmlspecialchars(xl('Demographics not authorized'),ENT_NOQUOTES) . ")</p>\n";
   echo "</body>\n</html>\n";
   exit();
  }
-
- if ($thisauth == 'write') {
+ if ($thisauth) {
   echo "<table><tr><td><span class='title'>" .
    htmlspecialchars(getPatientName($pid),ENT_NOQUOTES) .
    "</span></td>";
@@ -597,7 +632,7 @@ $widgetButtonLink = "demographics_full.php";
 $widgetButtonClass = "";
 $linkMethod = "html";
 $bodyClass = "";
-$widgetAuth = ($thisauth == "write");
+$widgetAuth = acl_check('patients', 'demo', '', 'write');
 $fixedWidth = true;
 expand_collapse_widget($widgetTitle, $widgetLabel, $widgetButtonLabel,
   $widgetButtonLink, $widgetButtonClass, $linkMethod, $bodyClass,
@@ -639,7 +674,7 @@ if ( $insurance_count > 0 ) {
   $widgetButtonClass = "";
   $linkMethod = "html";
   $bodyClass = "";
-  $widgetAuth = ($thisauth == "write");
+  $widgetAuth = acl_check('patients', 'demo', '', 'write');
   $fixedWidth = true;
   expand_collapse_widget($widgetTitle, $widgetLabel, $widgetButtonLabel,
     $widgetButtonLink, $widgetButtonClass, $linkMethod, $bodyClass,
@@ -1139,7 +1174,7 @@ expand_collapse_widget($widgetTitle, $widgetLabel, $widgetButtonLabel,
 	if (isset($pid) && !$GLOBALS['disable_calendar']) {
 	 $query = "SELECT e.pc_eid, e.pc_aid, e.pc_title, e.pc_eventDate, " .
 	  "e.pc_startTime, e.pc_hometext, u.fname, u.lname, u.mname, " .
-	  "c.pc_catname " .
+	  "c.pc_catname, e.pc_apptstatus " .
 	  "FROM openemr_postcalendar_events AS e, users AS u, " .
 	  "openemr_postcalendar_categories AS c WHERE " .
 	  "e.pc_pid = ? AND e.pc_eventDate >= CURRENT_DATE AND " .
@@ -1147,61 +1182,117 @@ expand_collapse_widget($widgetTitle, $widgetLabel, $widgetButtonLabel,
 	  "ORDER BY e.pc_eventDate, e.pc_startTime";
 	 $res = sqlStatement($query, array($pid) );
 
-        if ( (acl_check('patients', 'med')) && ($GLOBALS['enable_cdr'] && $GLOBALS['enable_cdr_crw']) ) {
-          // clinical summary expand collapse widget
-	  $widgetTitle = xl("Clinical Reminders");
-	  $widgetLabel = "clinical_reminders";
-	  $widgetButtonLabel = xl("Edit");
-	  $widgetButtonLink = "../reminder/clinical_reminders.php?patient_id=".$pid;;
-	  $widgetButtonClass = "";
-	  $linkMethod = "html";
-	  $bodyClass = "summary_item small";
-	  $widgetAuth = true;
-	  $fixedWidth = false;
-	  expand_collapse_widget($widgetTitle, $widgetLabel, $widgetButtonLabel , $widgetButtonLink, $widgetButtonClass, $linkMethod, $bodyClass, $widgetAuth, $fixedWidth);
-          echo "<br/>";
-          echo "<div style='margin-left:10px' class='text'><image src='../../pic/ajax-loader.gif'/></div><br/>";
-	  echo "</div>";
+     if ( (acl_check('patients', 'med')) && ($GLOBALS['enable_cdr'] && $GLOBALS['enable_cdr_crw']) ) {
+        // clinical summary expand collapse widget
+        $widgetTitle = xl("Clinical Reminders");
+        $widgetLabel = "clinical_reminders";
+        $widgetButtonLabel = xl("Edit");
+        $widgetButtonLink = "../reminder/clinical_reminders.php?patient_id=".$pid;;
+        $widgetButtonClass = "";
+        $linkMethod = "html";
+        $bodyClass = "summary_item small";
+        $widgetAuth = true;
+        $fixedWidth = false;
+        expand_collapse_widget($widgetTitle, $widgetLabel, $widgetButtonLabel , $widgetButtonLink, $widgetButtonClass, $linkMethod, $bodyClass, $widgetAuth, $fixedWidth);
+        echo "<br/>";
+        echo "<div style='margin-left:10px' class='text'><image src='../../pic/ajax-loader.gif'/></div><br/>";
+        echo "</div>";
         } // end if crw
 
 	// appointments expand collapse widget
-	$widgetTitle = xl("Appointments");
-	$widgetLabel = "appointments";
-	$widgetButtonLabel = xl("Add");
-	$widgetButtonLink = "return newEvt();";
-	$widgetButtonClass = "";
-	$linkMethod = "javascript";
-	$bodyClass = "summary_item small";
-	$widgetAuth = (isset($res) && $res != null);
-	$fixedWidth = false;
-	expand_collapse_widget($widgetTitle, $widgetLabel, $widgetButtonLabel , $widgetButtonLink, $widgetButtonClass, $linkMethod, $bodyClass, $widgetAuth, $fixedWidth);
+        $widgetTitle = xl("Appointments");
+        $widgetLabel = "appointments";
+        $widgetButtonLabel = xl("Add");
+        $widgetButtonLink = "return newEvt();";
+        $widgetButtonClass = "";
+        $linkMethod = "javascript";
+        $bodyClass = "summary_item small";
+        $widgetAuth = (isset($res) && $res != null);
+        $fixedWidth = false;
+        expand_collapse_widget($widgetTitle, $widgetLabel, $widgetButtonLabel , $widgetButtonLink, $widgetButtonClass, $linkMethod, $bodyClass, $widgetAuth, $fixedWidth);
+        $count = 0;
+        while($row = sqlFetchArray($res)) {
+            $count++;
+            $dayname = date("l", strtotime($row['pc_eventDate']));
+            $dispampm = "am";
+            $disphour = substr($row['pc_startTime'], 0, 2) + 0;
+            $dispmin  = substr($row['pc_startTime'], 3, 2);
+            if ($disphour >= 12) {
+                $dispampm = "pm";
+                if ($disphour > 12) $disphour -= 12;
+            }
+            $etitle = xl('(Click to edit)');
+            if ($row['pc_hometext'] != "") {
+                $etitle = xl('Comments').": ".($row['pc_hometext'])."\r\n".$etitle;
+            }
+            echo "<a href='javascript:oldEvt(" . htmlspecialchars($row['pc_eid'],ENT_QUOTES) . ")' title='" . htmlspecialchars($etitle,ENT_QUOTES) . "'>";
+            echo "<b>" . htmlspecialchars(xl($dayname) . ", " . $row['pc_eventDate'],ENT_NOQUOTES) . "</b>" . xlt("Status") .  "(";
+            echo " " .  generate_display_field(array('data_type'=>'1','list_id'=>'apptstat'),$row['pc_apptstatus']) . ")<br>";   // can't use special char parser on this
+            echo htmlspecialchars("$disphour:$dispmin " . xl($dispampm) . " " . xl_appt_category($row['pc_catname']),ENT_NOQUOTES) . "<br>\n";
+            echo htmlspecialchars($row['fname'] . " " . $row['lname'],ENT_NOQUOTES) . "</a><br>\n";
+        }
+        if (isset($res) && $res != null) {
+            if ( $count < 1 ) { 
+                echo "&nbsp;&nbsp;" . htmlspecialchars(xl('None'),ENT_NOQUOTES); 
+            }
+            echo "</div>";
+      }
+    }
+            
+	// Show PAST appointments.
+	if (isset($pid) && !$GLOBALS['disable_calendar'] && $GLOBALS['num_past_appointments_to_show'] > 0) {
+	 $query = "SELECT e.pc_eid, e.pc_aid, e.pc_title, e.pc_eventDate, " .
+	  "e.pc_startTime, e.pc_hometext, u.fname, u.lname, u.mname, " .
+	  "c.pc_catname, e.pc_apptstatus " .
+	  "FROM openemr_postcalendar_events AS e, users AS u, " .
+	  "openemr_postcalendar_categories AS c WHERE " .
+	  "e.pc_pid = ? AND e.pc_eventDate < CURRENT_DATE AND " .
+	  "u.id = e.pc_aid AND e.pc_catid = c.pc_catid " .
+	  "ORDER BY e.pc_eventDate, e.pc_startTime DESC " . 
+      "LIMIT " . $GLOBALS['num_past_appointments_to_show'];
+	
+     $pres = sqlStatement($query, array($pid) );
 
-			 $count = 0;
-			 while($row = sqlFetchArray($res)) {
-			  $count++;
-			  $dayname = date("l", strtotime($row['pc_eventDate']));
-			  $dispampm = "am";
-			  $disphour = substr($row['pc_startTime'], 0, 2) + 0;
-			  $dispmin  = substr($row['pc_startTime'], 3, 2);
-			  if ($disphour >= 12) {
-			   $dispampm = "pm";
-			   if ($disphour > 12) $disphour -= 12;
-			  }
-			  $etitle = xl('(Click to edit)');
-			  if ($row['pc_hometext'] != "") {
-				$etitle = xl('Comments').": ".($row['pc_hometext'])."\r\n".$etitle;
-			  }
-              echo "<a href='javascript:oldEvt(" . htmlspecialchars($row['pc_eid'],ENT_QUOTES) .
-		")' title='" . htmlspecialchars($etitle,ENT_QUOTES) . "'>";
-			  echo "<b>" . htmlspecialchars(xl($dayname) . ", " . $row['pc_eventDate'],ENT_NOQUOTES) . "</b><br>";
-			  echo htmlspecialchars("$disphour:$dispmin " . xl($dispampm) . " " . xl_appt_category($row['pc_catname']),ENT_NOQUOTES) . "<br>\n";
-			  echo htmlspecialchars($row['fname'] . " " . $row['lname'],ENT_NOQUOTES) . "</a><br>\n";
-			 }
-			 if (isset($res) && $res != null) {
-				if ( $count < 1 ) { echo "&nbsp;&nbsp;" . htmlspecialchars(xl('None'),ENT_NOQUOTES); }
-				echo "</div>";
-			 }
-			}
+	// appointments expand collapse widget
+        $widgetTitle = xl("Past Appoinments");
+        $widgetLabel = "past_appointments";
+        $widgetButtonLabel = '';
+        $widgetButtonLink = '';
+        $widgetButtonClass = '';
+        $linkMethod = "javascript";
+        $bodyClass = "summary_item small";
+        $widgetAuth = false; //no button
+        $fixedWidth = false;
+        expand_collapse_widget($widgetTitle, $widgetLabel, $widgetButtonLabel , $widgetButtonLink, $widgetButtonClass, $linkMethod, $bodyClass, $widgetAuth, $fixedWidth);   
+        $count = 0;
+        while($row = sqlFetchArray($pres)) {
+            $count++;
+            $dayname = date("l", strtotime($row['pc_eventDate']));
+            $dispampm = "am";
+            $disphour = substr($row['pc_startTime'], 0, 2) + 0;
+            $dispmin  = substr($row['pc_startTime'], 3, 2);
+            if ($disphour >= 12) {
+                $dispampm = "pm";
+                if ($disphour > 12) $disphour -= 12;
+            }
+            if ($row['pc_hometext'] != "") {
+                $etitle = xl('Comments').": ".($row['pc_hometext'])."\r\n".$etitle;
+            }
+            echo "<a href='javascript:oldEvt(" . htmlspecialchars($row['pc_eid'],ENT_QUOTES) . ")' title='" . htmlspecialchars($etitle,ENT_QUOTES) . "'>";
+            echo "<b>" . htmlspecialchars(xl($dayname) . ", " . $row['pc_eventDate'],ENT_NOQUOTES) . "</b>" . xlt("Status") .  "(";
+            echo " " .  generate_display_field(array('data_type'=>'1','list_id'=>'apptstat'),$row['pc_apptstatus']) . ")<br>";   // can't use special char parser on this
+            echo htmlspecialchars("$disphour:$dispmin ") . xl($dispampm) . " ";
+            echo htmlspecialchars($row['fname'] . " " . $row['lname'],ENT_NOQUOTES) . "</a><br>\n";
+        }
+        if (isset($pres) && $res != null) {
+           if ( $count < 1 ) { 
+               echo "&nbsp;&nbsp;" . htmlspecialchars(xl('None'),ENT_NOQUOTES);          
+           }
+        echo "</div>";
+        }
+    }
+// END of past appointments            
+            
 			?>
 		</div>
 
@@ -1221,35 +1312,6 @@ expand_collapse_widget($widgetTitle, $widgetLabel, $widgetButtonLabel,
 </table>
 
 </div> <!-- end main content div -->
-
-<?php if ($GLOBALS['concurrent_layout'] && isset($_GET['set_pid'])) { ?>
-<script language='JavaScript'>
- top.window.parent.left_nav.setPatient(<?php echo "'" . htmlspecialchars(($result['fname']) . " " . ($result['lname']),ENT_QUOTES) .
-   "'," . htmlspecialchars($pid,ENT_QUOTES) . ",'" . htmlspecialchars(($result['pubpid']),ENT_QUOTES) .
-   "','', ' " . htmlspecialchars(xl('DOB') . ": " . oeFormatShortDate($result['DOB_YMD']) . " " . xl('Age') . ": " . getPatientAge($result['DOB_YMD']), ENT_QUOTES) . "'"; ?>);
-EncounterDateArray=new Array;
-CalendarCategoryArray=new Array;
-EncounterIdArray=new Array;
-Count=0;
- <?php
- //Encounter details are stored to javacript as array.
-$result4 = sqlStatement("SELECT fe.encounter,fe.date,openemr_postcalendar_categories.pc_catname FROM form_encounter AS fe ".
-	" left join openemr_postcalendar_categories on fe.pc_catid=openemr_postcalendar_categories.pc_catid  WHERE fe.pid = ? order by fe.date desc", array($pid));
-   if(sqlNumRows($result4)>0)
-	while($rowresult4 = sqlFetchArray($result4))
-	 {
-?>
-		EncounterIdArray[Count]='<?php echo htmlspecialchars($rowresult4['encounter'], ENT_QUOTES); ?>';
-		EncounterDateArray[Count]='<?php echo htmlspecialchars(oeFormatShortDate(date("Y-m-d", strtotime($rowresult4['date']))), ENT_QUOTES); ?>';
-		CalendarCategoryArray[Count]='<?php echo htmlspecialchars( xl_appt_category($rowresult4['pc_catname']), ENT_QUOTES); ?>';
-		Count++;
- <?php
-	 }
- ?>
- top.window.parent.left_nav.setPatientEncounter(EncounterIdArray,EncounterDateArray,CalendarCategoryArray);
- parent.left_nav.setRadio(window.name, 'dem');
-</script>
-<?php } ?>
 
 <?php if (false && $GLOBALS['athletic_team']) { ?>
 <script language='JavaScript'>

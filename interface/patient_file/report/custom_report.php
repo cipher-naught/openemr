@@ -18,6 +18,14 @@ require_once("$srcdir/classes/Note.class.php");
 require_once("$srcdir/formatting.inc.php");
 require_once(dirname(__file__) . "/../../../custom/code_types.inc.php");
 
+$PDF_OUTPUT = empty($_POST['pdf']) ? false : true;
+
+if ($PDF_OUTPUT) {
+  require_once("$srcdir/html2pdf/html2pdf.class.php");
+  $pdf = new HTML2PDF('P', 'Letter', 'en');
+  ob_start();
+}
+
 // get various authorization levels
 $auth_notes_a  = acl_check('encounters', 'notes_a');
 $auth_notes    = acl_check('encounters', 'notes');
@@ -28,10 +36,32 @@ $auth_med      = acl_check('patients'  , 'med');
 $auth_demo     = acl_check('patients'  , 'demo');
 
 $printable = empty($_GET['printable']) ? false : true;
+if ($PDF_OUTPUT) $printable = true;
 unset($_GET['printable']);
 
-$N = 6;
+// Number of columns in tables for insurance and encounter forms.
+$N = $PDF_OUTPUT ? 4 : 6;
+
 $first_issue = 1;
+
+function getContent() {
+  global $web_root, $webserver_root;
+  $content = ob_get_clean();
+  // Fix a nasty html2pdf bug - it ignores document root!
+  $i = 0;
+  $wrlen = strlen($web_root);
+  $wsrlen = strlen($webserver_root);
+  while (true) {
+    $i = stripos($content, " src='/", $i + 1);
+    if ($i === false) break;
+    if (substr($content, $i+6, $wrlen) === $web_root &&
+        substr($content, $i+6, $wsrlen) !== $webserver_root)
+    {
+      $content = substr($content, 0, $i + 6) . $webserver_root . substr($content, $i + 6 + $wrlen);
+    }
+  }
+  return $content;
+}
 
 function postToGet($arin) {
   $getstring="";
@@ -48,10 +78,14 @@ function postToGet($arin) {
   return $getstring;
 }
 ?>
+
+<?php if ($PDF_OUTPUT) { ?>
+<link rel="stylesheet" href="<?php echo $webserver_root; ?>/interface/themes/style_pdf.css" type="text/css">
+<?php } else {?>
 <html>
 <head>
-<?php html_header_show();?>
 <link rel="stylesheet" href="<?php echo $css_header;?>" type="text/css">
+<?php } ?>
 
 <?php // do not show stuff from report.php in forms that is encaspulated
       // by div of navigateLink class. Specifically used for CAMOS, but
@@ -59,9 +93,11 @@ function postToGet($arin) {
       // encounter listings output, but not in the custom report. ?>
 <style> div.navigateLink {display:none;} </style>
 
+<?php if (!$PDF_OUTPUT) { ?>
 </head>
-
 <body class="body_top">
+<?php } ?>
+
 <div id="report_custom">  <!-- large outer DIV -->
 
 <?php
@@ -95,7 +131,7 @@ if ($printable) {
 <?php echo $facility['street'] ?><br>
 <?php echo $facility['city'] ?>, <?php echo $facility['state'] ?> <?php echo $facility['postal_code'] ?><br clear='all'>
 <?php echo $facility['phone'] ?><br>
-</p>
+
 <a href="javascript:window.close();"><span class='title'><?php echo $titleres['fname'] . " " . $titleres['lname']; ?></span></a><br>
 <span class='text'><?php xl('Generated on','e'); ?>: <?php echo oeFormatShortDate(); ?></span>
 <br><br>
@@ -133,6 +169,7 @@ while($result = sqlFetchArray($inclookupres)) {
 // For each form field from patient_report.php...
 //
 foreach ($ar as $key => $val) {
+    if ($key == 'pdf') continue;
 
     // These are the top checkboxes (demographics, allergies, etc.).
     //
@@ -324,10 +361,12 @@ foreach ($ar as $key => $val) {
                 if (!is_numeric($document_id)) continue;
                 $d = new Document($document_id);
                 $fname = basename($d->get_url());
+				$couch_docid = $d->get_couch_docid();
+				$couch_revid = $d->get_couch_revid();
                 $extension = substr($fname, strrpos($fname,"."));
                 echo "<h1>" . xl('Document') . " '" . $fname ."'</h1>";
                 $notes = Note::notes_factory($d->get_id());
-                echo "<table>";
+                if (!empty($notes)) echo "<table>";
                 foreach ($notes as $note) {
                     echo '<tr>';
                     echo '<td>' . xl('Note') . ' #' . $note->get_id() . '</td>';
@@ -339,27 +378,87 @@ foreach ($ar as $key => $val) {
                     echo '<td>'.$note->get_note().'<br><br></td>';
                     echo '</tr>';
                 }
-                echo "</table>";
-                if ($extension == ".png" || $extension == ".jpg" || $extension == ".jpeg" || $extension == ".gif") {
-                    echo "<img src='" . $GLOBALS['webroot'] . "/controller.php?document&retrieve&patient_id=&document_id=" . $document_id . "&as_file=false'><br><br>";
+                if (!empty($notes)) echo "</table>";
+
+                $url_file = $d->get_url_filepath();
+                if($couch_docid && $couch_revid){
+                  $url_file = $d->get_couch_url($pid,$encounter);
+                }
+                // just grab the last two levels, which contain filename and patientid
+                $from_all = explode("/",$url_file);
+                $from_filename = array_pop($from_all);
+                $from_patientid = array_pop($from_all);
+                if($couch_docid && $couch_revid) {
+                  $from_file = $GLOBALS['OE_SITE_DIR'] . '/documents/temp/' . $from_filename;
+                  $to_file = substr($from_file, 0, strrpos($from_file, '.')) . '_converted.jpg';
                 }
                 else {
-                    // echo "<b>NOTE</b>: ".xl('Document')."'" . $fname ."' ".xl('cannot be displayed inline because its type is not supported by the browser.')."<br><br>";	
-                    // This requires ImageMagick to be installed.
-                    $url_file = $d->get_url_filepath();
-                    // just grab the last two levels, which contain filename and patientid
-                    $from_all = explode("/",$url_file);
-                    $from_filename = array_pop($from_all);
-                    $from_patientid = array_pop($from_all);
-                    $from_file = $GLOBALS["fileroot"] . "/sites/" . $_SESSION['site_id'] .'/documents/'. $from_patientid.'/'.$from_filename;
-                    $to_file = substr($from_file, 0, strrpos($from_file, '.')) . '_converted.jpg';
-                    if (! is_file($to_file)) exec("convert -density 200 \"$from_file\" -append -resize 850 \"$to_file\"");
-                    if (is_file($to_file)) {
-                        echo "<img src='" . $GLOBALS['webroot'] . "/controller.php?document&retrieve&patient_id=&document_id=" . $document_id . "&as_file=false&original_file=false'><br><br>";
-                    } else {
-                        echo "<b>NOTE</b>: " . xl('Document') . "'" . $fname . "' " .
-                        xl('cannot be converted to JPEG. Perhaps ImageMagick is not installed?') . "<br><br>";
-                    }
+                  $from_file = $GLOBALS["fileroot"] . "/sites/" . $_SESSION['site_id'] .
+                    '/documents/' . $from_patientid . '/' . $from_filename;
+                  $to_file = substr($from_file, 0, strrpos($from_file, '.')) . '_converted.jpg';
+                }
+
+                if ($extension == ".png" || $extension == ".jpg" || $extension == ".jpeg" || $extension == ".gif") {
+                  if ($PDF_OUTPUT) {
+                    // OK to link to the image file because it will be accessed by the
+                    // HTML2PDF parser and not the browser.
+                    $from_rel = $web_root . substr($from_file, strlen($webserver_root));
+                    echo "<img src='$from_rel'";
+                    // Flag images with excessive width for possible stylesheet action.
+                    $asize = getimagesize($from_file);
+                    if ($asize[0] > 750) echo " class='bigimage'";
+                    echo " /><br><br>";
+                  }
+                  else {
+                    echo "<img src='" . $GLOBALS['webroot'] .
+                      "/controller.php?document&retrieve&patient_id=&document_id=" .
+                      $document_id . "&as_file=false'><br><br>";
+                  }
+                }
+                else {
+
+          // Most clinic documents are expected to be PDFs, and in that happy case
+          // we can avoid the lengthy image conversion process.
+          if ($PDF_OUTPUT && $extension == ".pdf") {
+            // HTML to PDF conversion will fail if there are open tags.
+            echo "</div></div>\n";
+            $content = getContent();
+            // $pdf->setDefaultFont('Arial');
+            $pdf->writeHTML($content, false);
+            $pagecount = $pdf->pdf->setSourceFile($from_file);
+            for($i = 0; $i < $pagecount; ++$i){
+              $pdf->pdf->AddPage();  
+              $itpl = $pdf->pdf->importPage($i + 1, '/MediaBox');
+              $pdf->pdf->useTemplate($itpl);
+            }
+            // Make sure whatever follows is on a new page.
+            $pdf->pdf->AddPage();
+            // Resume output buffering and the above-closed tags.
+            ob_start();
+            echo "<div><div class='text documents'>\n";
+          }
+          else {
+            if (! is_file($to_file)) exec("convert -density 200 \"$from_file\" -append -resize 850 \"$to_file\"");
+            if (is_file($to_file)) {
+              if ($PDF_OUTPUT) {
+                // OK to link to the image file because it will be accessed by the
+                // HTML2PDF parser and not the browser.
+                echo "<img src='$to_file'><br><br>";
+              }
+              else {
+                echo "<img src='" . $GLOBALS['webroot'] .
+                  "/controller.php?document&retrieve&patient_id=&document_id=" .
+                  $document_id . "&as_file=false&original_file=false'><br><br>";
+              }
+            } else {
+              echo "<b>NOTE</b>: " . xl('Document') . "'" . $fname . "' " .
+                xl('cannot be converted to JPEG. Perhaps ImageMagick is not installed?') . "<br><br>";
+              if($couch_docid && $couch_revid) {
+                unlink($from_file);
+              }
+            }
+          }
+
                 } // end if-else
             } // end Documents loop
             echo "</div>";
@@ -441,14 +540,7 @@ foreach ($ar as $key => $val) {
                 echo "(" . oeFormatSDFT(strtotime($dateres["date"])) . ") ";
                 if ($res[1] == 'newpatient') {
                     // display the provider info
-                    $tmp = sqlQuery("SELECT u.title, u.fname, u.mname, u.lname " .
-                                    "FROM forms AS f, users AS u WHERE " .
-                                    "f.pid = '$pid' AND f.encounter = '$form_encounter' AND " .
-                                    "f.formdir = 'newpatient' AND u.username = f.user " .
-                                    " AND f.deleted=0 ". //--JRM--
-                                    "ORDER BY f.id LIMIT 1");
-                    echo ' '. xl('Provider') . ': ' . $tmp['title'] . ' ' .
-                        $tmp['fname'] . ' ' . $tmp['mname'] . ' ' . $tmp['lname'];
+                    echo ' '. xl('Provider') . ': ' . text(getProviderName(getProviderIdOfEncounter($form_encounter)));
                 }
                 echo "<br>\n";
    
@@ -460,10 +552,15 @@ foreach ($ar as $key => $val) {
 
                 if ($res[1] == 'newpatient') {
                     // display billing info
-                    $bres = sqlStatement("SELECT date, code, code_text FROM billing WHERE " .
-                                        "pid = '$pid' AND encounter = '$form_encounter' AND activity = 1 AND " .
-                                        "( code_type = 'CPT4' OR code_type = 'OPCS' OR code_type = 'OSICS10' ) " .
-                                        "ORDER BY date");
+                    $bres = sqlStatement("SELECT b.date, b.code, b.code_text " .
+                      "FROM billing AS b, code_types AS ct WHERE " .
+                      "b.pid = ? AND " .
+                      "b.encounter = ? AND " .
+                      "b.activity = 1 AND " .
+                      "b.code_type = ct.ct_key AND " .
+                      "ct.ct_diag = 0 " .
+                      "ORDER BY b.date",
+                      array($pid, $form_encounter));
                     while ($brow=sqlFetchArray($bres)) {
                         echo "<span class='bold'>&nbsp;".xl('Procedure').": </span><span class='text'>" .
                             $brow['code'] . " " . $brow['code_text'] . "</span><br>\n";
@@ -481,9 +578,20 @@ foreach ($ar as $key => $val) {
 } // end $ar loop
 
 if ($printable)
-  echo "</br></br>" . xl('Signature') . ": _______________________________</br>";
+  echo "<br /><br />" . xl('Signature') . ": _______________________________<br />";
 ?>
 
 </div> <!-- end of report_custom DIV -->
+
+<?php
+if ($PDF_OUTPUT) {
+  $content = getContent();
+  // $pdf->setDefaultFont('Arial');
+  $pdf->writeHTML($content, false);
+  $pdf->Output('report.pdf', 'D'); // D = Download, I = Inline
+}
+else {
+?>
 </body>
 </html>
+<?php } ?>

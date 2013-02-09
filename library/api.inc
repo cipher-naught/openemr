@@ -3,6 +3,7 @@
 include_once("../../globals.php");
 include_once("{$GLOBALS['srcdir']}/sql.inc");
 include_once("{$GLOBALS['srcdir']}/billing.inc");
+include_once("{$GLOBALS['srcdir']}/formdata.inc.php");
 
 $GLOBALS['form_exit_url'] = $GLOBALS['concurrent_layout'] ?
 	"$rootdir/patient_file/encounter/encounter_top.php" :
@@ -14,10 +15,10 @@ function formHeader ($title = "My Form")
 	<html>
 	<head>
 <?php html_header_show();?>
-	<link rel=stylesheet href="<?=$GLOBALS['css_header']?>" type="text/css">
-	<title><?=$title?></title>
+	<link rel=stylesheet href="<?php echo $GLOBALS['css_header']?>" type="text/css">
+	<title><?php echo $title?></title>
 	</head>
-	<body background="<?=$GLOBALS['backpic']?>" topmargin=0 rightmargin=0 leftmargin=2 bottommargin=0 marginwidth=2 marginheight=0>
+	<body background="<?php echo $GLOBALS['backpic']?>" topmargin=0 rightmargin=0 leftmargin=2 bottommargin=0 marginwidth=2 marginheight=0>
 	<?php
 }
 
@@ -29,8 +30,14 @@ function formFooter ()
 	<?php
 }
 
+// This function will escape the $values when using the new security method (ie. $sanitize_all_escapes is TRUE).
+//   Otherwise, this function expects the $values to already be escaped(original and legacy behavior).
 function formSubmit ($tableName, $values, $id, $authorized = "0")
 {
+        // Bring in $sanitize_all_escapes variable, which will decide
+        // the variable escaping method.
+        global $sanitize_all_escapes;
+
 	$sql = "insert into $tableName set pid = {$_SESSION['pid']},groupname='".$_SESSION['authProvider']."',user='".$_SESSION['authUser']."',authorized=$authorized,activity=1, date = NOW(),";
 	foreach ($values as $key => $value)
 		if (strpos($key,"openemr_net_cpt") === 0) {
@@ -52,7 +59,14 @@ function formSubmit ($tableName, $values, $id, $authorized = "0")
 			}
 		}
 		else {
-			$sql .= " $key = '$value',";
+                        if (isset($sanitize_all_escapes) && $sanitize_all_escapes) {
+                                // using new security method, so escape the key and values here
+                                $sql .= " " . add_escape_custom($key) . " = '" . add_escape_custom($value) . "',";
+                        }
+                        else {
+                                // original method (rely on code to escape values before using this function)
+			        $sql .= " $key = '$value',";
+                        }
 		}
 	$sql = substr($sql, 0, -1);
 	return sqlInsert($sql);

@@ -35,8 +35,7 @@ include_once("../../library/acl.inc");
 </td>
 
 <?php
- $npauth = acl_check('patients', 'demo');
- if ($npauth == 'write' || $npauth == 'addonly') {
+ if (acl_check('patients','demo','',array('write','addonly') )) {
 ?>
 <td align="center" nowrap>
 &nbsp;<a class="menu" target=_top href="../new/new_patient.php" onclick="top.restoreSession()">
@@ -82,8 +81,7 @@ include_once("../../library/acl.inc");
 </td>
 
 <?php
-  $tmp = acl_check('patients', 'demo');
-  if (($tmp == 'write' || $tmp == 'addonly') &&
+  if ( (acl_check('patients','demo','',array('write','addonly') )) &&
     is_readable("$webserver_root/custom/import.php")) {
 ?>
 <td align="center" nowrap>
@@ -144,7 +142,7 @@ include_once("../../library/acl.inc");
 </td>
 
 <td align="center" nowrap>
-&nbsp;<a href="http://open-emr.org/wiki/index.php/OpenEMR_4.1_Users_Guide" target="_blank" class="menu"> 
+&nbsp;<a href="http://open-emr.org/wiki/index.php/OpenEMR_4.1.1_Users_Guide" target="_blank" class="menu"> 
 <?php xl('Manual','e'); ?></a>&nbsp;&nbsp;
 </td>
 

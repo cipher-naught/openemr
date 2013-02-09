@@ -68,7 +68,7 @@ CREATE TABLE `audit_master` (
   `created_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `modified_time` datetime NOT NULL,
   `ip_address` varchar(100) NOT NULL,
-  `type` tinyint(4) NOT NULL COMMENT '1-new patient,2-existing patient,3-change is only in the document,5-random key,10-Appointment',
+  `type` tinyint(4) NOT NULL COMMENT '1-new patient,2-existing patient,3-change is only in the document,4-Patient upload,5-random key,10-Appointment',
   PRIMARY KEY (`id`)
 ) ENGINE=MyISAM AUTO_INCREMENT=1;
 
@@ -112,8 +112,8 @@ DROP TABLE IF EXISTS `billing`;
 CREATE TABLE `billing` (
   `id` int(11) NOT NULL auto_increment,
   `date` datetime default NULL,
-  `code_type` varchar(7) default NULL,
-  `code` varchar(9) default NULL,
+  `code_type` varchar(15) default NULL,
+  `code` varchar(20) default NULL,
   `pid` int(11) default NULL,
   `provider_id` int(11) default NULL,
   `user` int(11) default NULL,
@@ -488,9 +488,9 @@ CREATE TABLE `codes` (
   `id` int(11) NOT NULL auto_increment,
   `code_text` varchar(255) NOT NULL default '',
   `code_text_short` varchar(24) NOT NULL default '',
-  `code` varchar(10) NOT NULL default '',
-  `code_type` tinyint(2) default NULL,
-  `modifier` varchar(5) NOT NULL default '',
+  `code` varchar(25) NOT NULL default '',
+  `code_type` smallint(6) default NULL,
+  `modifier` varchar(12) NOT NULL default '',
   `units` tinyint(3) default NULL,
   `fee` decimal(12,2) default NULL,
   `superbill` varchar(31) NOT NULL default '',
@@ -499,8 +499,10 @@ CREATE TABLE `codes` (
   `cyp_factor` float NOT NULL DEFAULT 0 COMMENT 'quantity representing a years supply',
   `active` TINYINT(1) DEFAULT 1 COMMENT '0 = inactive, 1 = active',
   `reportable` TINYINT(1) DEFAULT 0 COMMENT '0 = non-reportable, 1 = reportable',
+  `financial_reporting` TINYINT(1) DEFAULT 0 COMMENT '0 = negative, 1 = considered important code in financial reporting',
   PRIMARY KEY  (`id`),
-  KEY `code` (`code`)
+  KEY `code` (`code`),
+  KEY `code_type` (`code_type`)
 ) ENGINE=MyISAM AUTO_INCREMENT=1 ;
 -- --------------------------------------------------------
 
@@ -614,6 +616,9 @@ CREATE TABLE `documents` (
   `docdate` date default NULL,
   `hash` varchar(40) DEFAULT NULL COMMENT '40-character SHA-1 hash of document',
   `list_id` bigint(20) NOT NULL default '0',
+  `couch_docid` VARCHAR(100) DEFAULT NULL,
+  `couch_revid` VARCHAR(100) DEFAULT NULL,
+  `storagemethod` TINYINT(4) NOT NULL DEFAULT '0' COMMENT '0->Harddisk,1->CouchDB',
   PRIMARY KEY  (`id`),
   KEY `revision` (`revision`),
   KEY `foreign_id` (`foreign_id`),
@@ -634,7 +639,7 @@ CREATE TABLE `documents_legal_detail` (
   `dld_provider` int(10) unsigned DEFAULT NULL,
   `dld_encounter` int(10) unsigned DEFAULT NULL,
   `dld_master_docid` int(10) unsigned NOT NULL,
-  `dld_signed` smallint(5) unsigned NOT NULL COMMENT '0-Not Signed or Cannot Sign(Layout),1-Signed,2-Ready to sign,3-Denied(Pat Regi),10-Save(Layout)',
+  `dld_signed` smallint(5) unsigned NOT NULL COMMENT '0-Not Signed or Cannot Sign(Layout),1-Signed,2-Ready to sign,3-Denied(Pat Regi),4-Patient Upload,10-Save(Layout)',
   `dld_signed_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `dld_filepath` varchar(75) DEFAULT NULL,
   `dld_filename` varchar(45) NOT NULL,
@@ -643,6 +648,8 @@ CREATE TABLE `documents_legal_detail` (
   `dld_content` varchar(50) NOT NULL COMMENT 'Layout sign position',
   `dld_file_for_pdf_generation` blob NOT NULL COMMENT 'The filled details in the fdf file is stored here.Patient Registration Screen',
   `dld_denial_reason` longtext NOT NULL,
+  `dld_moved` tinyint(4) NOT NULL DEFAULT '0',
+  `dld_patient_comments` text COMMENT 'Patient comments stored here',
   PRIMARY KEY (`dld_id`)
 ) ENGINE=MyISAM AUTO_INCREMENT=1 ;
 
@@ -669,6 +676,7 @@ CREATE TABLE `documents_legal_master` (
   `content` varchar(255) NOT NULL,
   `dlm_savedsign` varchar(255) DEFAULT NULL COMMENT '0-Yes 1-No',
   `dlm_review` varchar(255) DEFAULT NULL COMMENT '0-Yes 1-No',
+  `dlm_upload_type` tinyint(4) DEFAULT '0' COMMENT '0-Provider Uploaded,1-Patient Uploaded',
   PRIMARY KEY (`dlm_document_id`)
 ) ENGINE=MyISAM COMMENT='List of Master Docs to be signed' AUTO_INCREMENT=1 ;
 
@@ -929,6 +937,7 @@ CREATE TABLE `standardized_tables_track` (
   `name` varchar(255) NOT NULL default '' COMMENT 'name of standardized tables such as RXNORM',
   `revision_version` varchar(255) NOT NULL default '' COMMENT 'revision of standardized tables that were imported',
   `revision_date` datetime default NULL COMMENT 'revision of standardized tables that were imported',
+  `file_checksum` varchar(32) NOT NULL DEFAULT '',
   PRIMARY KEY  (`id`)
 ) ENGINE=MyISAM AUTO_INCREMENT=1 ;
 
@@ -971,6 +980,24 @@ CREATE TABLE `facility` (
 -- 
 
 INSERT INTO `facility` VALUES (3, 'Your Clinic Name Here', '000-000-0000', '000-000-0000', '', '', '', '', '', '', NULL, NULL, 1, 1, 0, NULL, '', '', '', '', '','#99FFFF','0');
+
+
+-- --------------------------------------------------------
+
+-- 
+-- Table structure for table `facility_user_ids`
+-- 
+
+DROP TABLE IF EXISTS `facility_user_ids`;
+CREATE TABLE  `facility_user_ids` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `uid` bigint(20) DEFAULT NULL,
+  `facility_id` bigint(20) DEFAULT NULL,
+  `field_id`    varchar(31)  NOT NULL COMMENT 'references layout_options.field_id',
+  `field_value` TEXT NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `uid` (`uid`,`facility_id`,`field_id`)
+) ENGINE=MyISAM  AUTO_INCREMENT=1 ;
 
 -- --------------------------------------------------------
 
@@ -1049,7 +1076,7 @@ CREATE TABLE `form_encounter` (
   `referral_source` varchar(31) NOT NULL DEFAULT '',
   `billing_facility` INT(11) NOT NULL DEFAULT 0,
   PRIMARY KEY  (`id`),
-  KEY `pid` (`pid`)
+  KEY `pid_encounter` (`pid`, `encounter`)
 ) ENGINE=MyISAM AUTO_INCREMENT=1 ;
 
 -- --------------------------------------------------------
@@ -1442,7 +1469,8 @@ CREATE TABLE `forms` (
   `deleted` tinyint(4) DEFAULT '0' NOT NULL COMMENT 'flag indicates form has been deleted',
   `formdir` longtext,
   PRIMARY KEY  (`id`),
-  KEY `pid` (`pid`)
+  KEY `pid_encounter` (`pid`, `encounter`),
+  KEY `form_id` (`form_id`)
 ) ENGINE=MyISAM AUTO_INCREMENT=1 ;
 
 -- --------------------------------------------------------
@@ -1886,7 +1914,7 @@ CREATE TABLE `history_data` (
   `value_2` varchar(255) default NULL,
   `additional_history` text,
   `exams`      text         NOT NULL DEFAULT '',
-  `usertext11` varchar(255) NOT NULL DEFAULT '',
+  `usertext11` TEXT NOT NULL,
   `usertext12` varchar(255) NOT NULL DEFAULT '',
   `usertext13` varchar(255) NOT NULL DEFAULT '',
   `usertext14` varchar(255) NOT NULL DEFAULT '',
@@ -1916,6 +1944,221 @@ CREATE TABLE `history_data` (
   PRIMARY KEY  (`id`),
   KEY `pid` (`pid`)
 ) ENGINE=MyISAM AUTO_INCREMENT=1 ;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `icd9_dx_code`
+--
+
+DROP TABLE IF EXISTS `icd9_dx_code`;
+CREATE TABLE `icd9_dx_code` (
+  `dx_id` SERIAL,
+  `dx_code`             varchar(5),
+  `formatted_dx_code`   varchar(6),
+  `short_desc`          varchar(60),
+  `long_desc`           varchar(300),
+  `active` tinyint default 0,
+  `revision` int default 0,
+  KEY `dx_code` (`dx_code`),
+  KEY `formatted_dx_code` (`formatted_dx_code`),
+  KEY `active` (`active`)
+) ENGINE=MyISAM;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `icd9_sg_code`
+--
+
+DROP TABLE IF EXISTS `icd9_sg_code`;
+CREATE TABLE `icd9_sg_code` (
+  `sg_id` SERIAL,
+  `sg_code`             varchar(5),
+  `formatted_sg_code`   varchar(6),
+  `short_desc`          varchar(60),
+  `long_desc`           varchar(300),
+  `active` tinyint default 0,
+  `revision` int default 0,
+  KEY `sg_code` (`sg_code`),
+  KEY `formatted_sg_code` (`formatted_sg_code`),
+  KEY `active` (`active`)
+) ENGINE=MyISAM;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `icd9_dx_long_code`
+--
+
+DROP TABLE IF EXISTS `icd9_dx_long_code`;
+CREATE TABLE `icd9_dx_long_code` (
+  `dx_id` SERIAL,
+  `dx_code`             varchar(5),
+  `long_desc`           varchar(300),
+  `active` tinyint default 0,
+  `revision` int default 0
+) ENGINE=MyISAM;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `icd9_sg_long_code`
+--
+
+DROP TABLE IF EXISTS `icd9_sg_long_code`;
+CREATE TABLE `icd9_sg_long_code` (
+  `sq_id` SERIAL,
+  `sg_code`             varchar(5),
+  `long_desc`           varchar(300),
+  `active` tinyint default 0,
+  `revision` int default 0
+) ENGINE=MyISAM;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `icd10_dx_order_code`
+--
+
+DROP TABLE IF EXISTS `icd10_dx_order_code`;
+CREATE TABLE `icd10_dx_order_code` (
+  `dx_id`               SERIAL,
+  `dx_code`             varchar(7),
+  `formatted_dx_code`   varchar(10),
+  `valid_for_coding`    char,
+  `short_desc`          varchar(60),
+  `long_desc`           varchar(300),
+  `active` tinyint default 0,
+  `revision` int default 0,
+  KEY `formatted_dx_code` (`formatted_dx_code`),
+  KEY `active` (`active`)
+) ENGINE=MyISAM;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `icd10_pcs_order_code`
+--
+
+DROP TABLE IF EXISTS `icd10_pcs_order_code`;
+CREATE TABLE `icd10_pcs_order_code` (
+  `pcs_id`              SERIAL,
+  `pcs_code`            varchar(7),
+  `valid_for_coding`    char,
+  `short_desc`          varchar(60),
+  `long_desc`           varchar(300),
+  `active` tinyint default 0,
+  `revision` int default 0,
+  KEY `pcs_code` (`pcs_code`),
+  KEY `active` (`active`)
+) ENGINE=MyISAM;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `icd10_gem_pcs_9_10`
+--
+
+DROP TABLE IF EXISTS `icd10_gem_pcs_9_10`;
+CREATE TABLE `icd10_gem_pcs_9_10` (
+  `map_id` SERIAL,
+  `pcs_icd9_source` varchar(5) default NULL,
+  `pcs_icd10_target` varchar(7) default NULL,
+  `flags` varchar(5) default NULL,
+  `active` tinyint default 0,
+  `revision` int default 0
+) ENGINE=MyISAM;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `icd10_gem_pcs_10_9`
+--
+
+DROP TABLE IF EXISTS `icd10_gem_pcs_10_9`;
+CREATE TABLE `icd10_gem_pcs_10_9` (
+  `map_id` SERIAL,
+  `pcs_icd10_source` varchar(7) default NULL,
+  `pcs_icd9_target` varchar(5) default NULL,
+  `flags` varchar(5) default NULL,
+  `active` tinyint default 0,
+  `revision` int default 0
+) ENGINE=MyISAM;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `icd10_gem_dx_9_10`
+--
+
+DROP TABLE IF EXISTS `icd10_gem_dx_9_10`;
+CREATE TABLE `icd10_gem_dx_9_10` (
+  `map_id` SERIAL,
+  `dx_icd9_source` varchar(5) default NULL,
+  `dx_icd10_target` varchar(7) default NULL,
+  `flags` varchar(5) default NULL,
+  `active` tinyint default 0,
+  `revision` int default 0
+) ENGINE=MyISAM;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `icd10_gem_dx_10_9`
+--
+
+DROP TABLE IF EXISTS `icd10_gem_dx_10_9`;
+CREATE TABLE `icd10_gem_dx_10_9` (
+  `map_id` SERIAL,
+  `dx_icd10_source` varchar(7) default NULL,
+  `dx_icd9_target` varchar(5) default NULL,
+  `flags` varchar(5) default NULL,
+  `active` tinyint default 0,
+  `revision` int default 0
+) ENGINE=MyISAM;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `icd10_reimbr_dx_9_10`
+--
+
+DROP TABLE IF EXISTS `icd10_reimbr_dx_9_10`;
+CREATE TABLE `icd10_reimbr_dx_9_10` (
+  `map_id` SERIAL,
+  `code`        varchar(8),
+  `code_cnt`    tinyint,
+  `ICD9_01`     varchar(5),
+  `ICD9_02`     varchar(5),
+  `ICD9_03`     varchar(5),
+  `ICD9_04`     varchar(5),
+  `ICD9_05`     varchar(5),
+  `ICD9_06`     varchar(5),
+  `active` tinyint default 0,
+  `revision` int default 0
+) ENGINE=MyISAM;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `icd10_reimbr_pcs_9_10`
+--
+
+DROP TABLE IF EXISTS `icd10_reimbr_pcs_9_10`;
+CREATE TABLE `icd10_reimbr_pcs_9_10` (
+  `map_id`      SERIAL,
+  `code`        varchar(8),
+  `code_cnt`    tinyint,
+  `ICD9_01`     varchar(5),
+  `ICD9_02`     varchar(5),
+  `ICD9_03`     varchar(5),
+  `ICD9_04`     varchar(5),
+  `ICD9_05`     varchar(5),
+  `ICD9_06`     varchar(5),
+  `active` tinyint default 0,
+  `revision` int default 0
+) ENGINE=MyISAM;
 
 -- --------------------------------------------------------
 
@@ -2140,144 +2383,148 @@ CREATE TABLE `layout_options` (
   `default_value` varchar(255) NOT NULL default '',
   `edit_options` varchar(36) NOT NULL default '',
   `description` text,
+  `fld_rows` int(11) NOT NULL default '0',
   PRIMARY KEY  (`form_id`,`field_id`,`seq`)
 ) ENGINE=MyISAM;
 
 -- 
 -- Dumping data for table `layout_options`
 -- 
-INSERT INTO `layout_options` VALUES ('DEM', 'title', '1Who', 'Name', 1, 1, 1, 0, 0, 'titles', 1, 1, '', 'N', 'Title');
-INSERT INTO `layout_options` VALUES ('DEM', 'fname', '1Who', '', 2, 2, 2, 10, 63, '', 0, 0, '', 'CD', 'First Name');
-INSERT INTO `layout_options` VALUES ('DEM', 'mname', '1Who', '', 3, 2, 1, 2, 63, '', 0, 0, '', 'C', 'Middle Name');
-INSERT INTO `layout_options` VALUES ('DEM', 'lname', '1Who', '', 4, 2, 2, 10, 63, '', 0, 0, '', 'CD', 'Last Name');
-INSERT INTO `layout_options` VALUES ('DEM', 'pubpid', '1Who', 'External ID', 5, 2, 1, 10, 15, '', 1, 1, '', 'ND', 'External identifier');
-INSERT INTO `layout_options` VALUES ('DEM', 'DOB', '1Who', 'DOB', 6, 4, 2, 10, 10, '', 1, 1, '', 'D', 'Date of Birth');
-INSERT INTO `layout_options` VALUES ('DEM', 'sex', '1Who', 'Sex', 7, 1, 2, 0, 0, 'sex', 1, 1, '', 'N', 'Sex');
-INSERT INTO `layout_options` VALUES ('DEM', 'ss', '1Who', 'S.S.', 8, 2, 1, 11, 11, '', 1, 1, '', '', 'Social Security Number');
-INSERT INTO `layout_options` VALUES ('DEM', 'drivers_license', '1Who', 'License/ID', 9, 2, 1, 15, 63, '', 1, 1, '', '', 'Drivers License or State ID');
-INSERT INTO `layout_options` VALUES ('DEM', 'status', '1Who', 'Marital Status', 10, 1, 1, 0, 0, 'marital', 1, 3, '', '', 'Marital Status');
-INSERT INTO `layout_options` VALUES ('DEM', 'genericname1', '1Who', 'User Defined', 11, 2, 1, 15, 63, '', 1, 3, '', '', 'User Defined Field');
-INSERT INTO `layout_options` VALUES ('DEM', 'genericval1', '1Who', '', 12, 2, 1, 15, 63, '', 0, 0, '', '', 'User Defined Field');
-INSERT INTO `layout_options` VALUES ('DEM', 'genericname2', '1Who', '', 13, 2, 1, 15, 63, '', 0, 0, '', '', 'User Defined Field');
-INSERT INTO `layout_options` VALUES ('DEM', 'genericval2', '1Who', '', 14, 2, 1, 15, 63, '', 0, 0, '', '', 'User Defined Field');
-INSERT INTO `layout_options` VALUES ('DEM', 'squad', '1Who', 'Squad', 15, 13, 0, 0, 0, '', 1, 3, '', '', 'Squad Membership');
-INSERT INTO `layout_options` VALUES ('DEM', 'pricelevel', '1Who', 'Price Level', 16, 1, 0, 0, 0, 'pricelevel', 1, 1, '', '', 'Discount Level');
-INSERT INTO `layout_options` VALUES ('DEM', 'street', '2Contact', 'Address', 1, 2, 1, 25, 63, '', 1, 1, '', 'C', 'Street and Number');
-INSERT INTO `layout_options` VALUES ('DEM', 'city', '2Contact', 'City', 2, 2, 1, 15, 63, '', 1, 1, '', 'C', 'City Name');
-INSERT INTO `layout_options` VALUES ('DEM', 'state', '2Contact', 'State', 3, 26, 1, 0, 0, 'state', 1, 1, '', '', 'State/Locality');
-INSERT INTO `layout_options` VALUES ('DEM', 'postal_code', '2Contact', 'Postal Code', 4, 2, 1, 6, 63, '', 1, 1, '', '', 'Postal Code');
-INSERT INTO `layout_options` VALUES ('DEM', 'country_code', '2Contact', 'Country', 5, 26, 1, 0, 0, 'country', 1, 1, '', '', 'Country');
-INSERT INTO `layout_options` VALUES ('DEM', 'mothersname', '2Contact', 'Mother''s Name', 6, 2, 1, 20, 63, '', 1, 1, '', '', '');
-INSERT INTO `layout_options` VALUES ('DEM', 'guardiansname', '2Contact', 'Guardian''s Name', 7, 2, 1, 20, 63, '', 1, 1, '', '', '');
-INSERT INTO `layout_options` VALUES ('DEM', 'contact_relationship', '2Contact', 'Emergency Contact', 8, 2, 1, 10, 63, '', 1, 1, '', 'C', 'Emergency Contact Person');
-INSERT INTO `layout_options` VALUES ('DEM', 'phone_contact', '2Contact', 'Emergency Phone', 9, 2, 1, 20, 63, '', 1, 1, '', 'P', 'Emergency Contact Phone Number');
-INSERT INTO `layout_options` VALUES ('DEM', 'phone_home', '2Contact', 'Home Phone', 10, 2, 1, 20, 63, '', 1, 1, '', 'P', 'Home Phone Number');
-INSERT INTO `layout_options` VALUES ('DEM', 'phone_biz', '2Contact', 'Work Phone', 11, 2, 1, 20, 63, '', 1, 1, '', 'P', 'Work Phone Number');
-INSERT INTO `layout_options` VALUES ('DEM', 'phone_cell', '2Contact', 'Mobile Phone', 12, 2, 1, 20, 63, '', 1, 1, '', 'P', 'Cell Phone Number');
-INSERT INTO `layout_options` VALUES ('DEM', 'email', '2Contact', 'Contact Email', 13, 2, 1, 30, 95, '', 1, 1, '', '', 'Contact Email Address');
-INSERT INTO `layout_options` VALUES ('DEM', 'providerID', '3Choices', 'Provider', 1, 11, 1, 0, 0, '', 1, 3, '', '', 'Referring Provider');
-INSERT INTO `layout_options` VALUES ('DEM', 'pharmacy_id', '3Choices', 'Pharmacy', 2, 12, 1, 0, 0, '', 1, 3, '', '', 'Preferred Pharmacy');
-INSERT INTO `layout_options` VALUES ('DEM', 'hipaa_notice', '3Choices', 'HIPAA Notice Received', 3, 1, 1, 0, 0, 'yesno', 1, 1, '', '', 'Did you receive a copy of the HIPAA Notice?');
-INSERT INTO `layout_options` VALUES ('DEM', 'hipaa_voice', '3Choices', 'Allow Voice Message', 4, 1, 1, 0, 0, 'yesno', 1, 1, '', '', 'Allow telephone messages?');
-INSERT INTO `layout_options` VALUES ('DEM', 'hipaa_message', '3Choices', 'Leave Message With', 5, 2, 1, 20, 63, '', 1, 1, '', '', 'With whom may we leave a message?');
-INSERT INTO `layout_options` VALUES ('DEM', 'hipaa_mail', '3Choices', 'Allow Mail Message', 6, 1, 1, 0, 0, 'yesno', 1, 1, '', '', 'Allow email messages?');
-INSERT INTO `layout_options` VALUES ('DEM', 'hipaa_allowsms'  , '3Choices', 'Allow SMS'  , 7, 1, 1, 0, 0, 'yesno', 1, 1, '', '', 'Allow SMS (text messages)?');
-INSERT INTO `layout_options` VALUES ('DEM', 'hipaa_allowemail', '3Choices', 'Allow Email', 8, 1, 1, 0, 0, 'yesno', 1, 1, '', '', 'Allow Email?');
+INSERT INTO `layout_options` VALUES ('DEM', 'title', '1Who', 'Name', 1, 1, 1, 0, 0, 'titles', 1, 1, '', 'N', 'Title', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'fname', '1Who', '', 2, 2, 2, 10, 63, '', 0, 0, '', 'CD', 'First Name', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'mname', '1Who', '', 3, 2, 1, 2, 63, '', 0, 0, '', 'C', 'Middle Name', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'lname', '1Who', '', 4, 2, 2, 10, 63, '', 0, 0, '', 'CD', 'Last Name', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'pubpid', '1Who', 'External ID', 5, 2, 1, 10, 15, '', 1, 1, '', 'ND', 'External identifier', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'DOB', '1Who', 'DOB', 6, 4, 2, 10, 10, '', 1, 1, '', 'D', 'Date of Birth', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'sex', '1Who', 'Sex', 7, 1, 2, 0, 0, 'sex', 1, 1, '', 'N', 'Sex', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'ss', '1Who', 'S.S.', 8, 2, 1, 11, 11, '', 1, 1, '', '', 'Social Security Number', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'drivers_license', '1Who', 'License/ID', 9, 2, 1, 15, 63, '', 1, 1, '', '', 'Drivers License or State ID', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'status', '1Who', 'Marital Status', 10, 1, 1, 0, 0, 'marital', 1, 3, '', '', 'Marital Status', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'genericname1', '1Who', 'User Defined', 11, 2, 1, 15, 63, '', 1, 3, '', '', 'User Defined Field', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'genericval1', '1Who', '', 12, 2, 1, 15, 63, '', 0, 0, '', '', 'User Defined Field', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'genericname2', '1Who', '', 13, 2, 1, 15, 63, '', 0, 0, '', '', 'User Defined Field', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'genericval2', '1Who', '', 14, 2, 1, 15, 63, '', 0, 0, '', '', 'User Defined Field', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'squad', '1Who', 'Squad', 15, 13, 0, 0, 0, '', 1, 3, '', '', 'Squad Membership', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'pricelevel', '1Who', 'Price Level', 16, 1, 0, 0, 0, 'pricelevel', 1, 1, '', '', 'Discount Level', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'street', '2Contact', 'Address', 1, 2, 1, 25, 63, '', 1, 1, '', 'C', 'Street and Number', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'city', '2Contact', 'City', 2, 2, 1, 15, 63, '', 1, 1, '', 'C', 'City Name', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'state', '2Contact', 'State', 3, 26, 1, 0, 0, 'state', 1, 1, '', '', 'State/Locality', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'postal_code', '2Contact', 'Postal Code', 4, 2, 1, 6, 63, '', 1, 1, '', '', 'Postal Code', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'country_code', '2Contact', 'Country', 5, 26, 1, 0, 0, 'country', 1, 1, '', '', 'Country', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'mothersname', '2Contact', 'Mother''s Name', 6, 2, 1, 20, 63, '', 1, 1, '', '', '', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'guardiansname', '2Contact', 'Guardian''s Name', 7, 2, 1, 20, 63, '', 1, 1, '', '', '', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'contact_relationship', '2Contact', 'Emergency Contact', 8, 2, 1, 10, 63, '', 1, 1, '', 'C', 'Emergency Contact Person', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'phone_contact', '2Contact', 'Emergency Phone', 9, 2, 1, 20, 63, '', 1, 1, '', 'P', 'Emergency Contact Phone Number', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'phone_home', '2Contact', 'Home Phone', 10, 2, 1, 20, 63, '', 1, 1, '', 'P', 'Home Phone Number', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'phone_biz', '2Contact', 'Work Phone', 11, 2, 1, 20, 63, '', 1, 1, '', 'P', 'Work Phone Number', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'phone_cell', '2Contact', 'Mobile Phone', 12, 2, 1, 20, 63, '', 1, 1, '', 'P', 'Cell Phone Number', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'email', '2Contact', 'Contact Email', 13, 2, 1, 30, 95, '', 1, 1, '', '', 'Contact Email Address', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'providerID', '3Choices', 'Provider', 1, 11, 1, 0, 0, '', 1, 3, '', '', 'Provider', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'ref_providerID', '3Choices', 'Referring Provider', 2, 11, 1, 0, 0, '', 1, 3, '', '', 'Referring Provider', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'pharmacy_id', '3Choices', 'Pharmacy', 3, 12, 1, 0, 0, '', 1, 3, '', '', 'Preferred Pharmacy', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'hipaa_notice', '3Choices', 'HIPAA Notice Received', 4, 1, 1, 0, 0, 'yesno', 1, 1, '', '', 'Did you receive a copy of the HIPAA Notice?', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'hipaa_voice', '3Choices', 'Allow Voice Message', 5, 1, 1, 0, 0, 'yesno', 1, 1, '', '', 'Allow telephone messages?', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'hipaa_message', '3Choices', 'Leave Message With', 6, 2, 1, 20, 63, '', 1, 1, '', '', 'With whom may we leave a message?', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'hipaa_mail', '3Choices', 'Allow Mail Message', 7, 1, 1, 0, 0, 'yesno', 1, 1, '', '', 'Allow email messages?', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'hipaa_allowsms'  , '3Choices', 'Allow SMS'  , 8, 1, 1, 0, 0, 'yesno', 1, 1, '', '', 'Allow SMS (text messages)?', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'hipaa_allowemail', '3Choices', 'Allow Email', 9, 1, 1, 0, 0, 'yesno', 1, 1, '', '', 'Allow Email?', 0);
 
-INSERT INTO `layout_options` VALUES ('DEM', 'allow_imm_reg_use', '3Choices', 'Allow Immunization Registry Use', 9, 1, 1, 0, 0, 'yesno', 1, 1, '', '', '');
-INSERT INTO `layout_options` VALUES ('DEM', 'allow_imm_info_share', '3Choices', 'Allow Immunization Info Sharing', 10, 1, 1, 0, 0, 'yesno', 1, 1, '', '', '');
-INSERT INTO `layout_options` VALUES ('DEM', 'allow_health_info_ex', '3Choices', 'Allow Health Information Exchange', 11, 1, 1, 0, 0, 'yesno', 1, 1, '', '', '');
-INSERT INTO `layout_options` VALUES ('DEM', 'allow_patient_portal', '3Choices', 'Allow Patient Portal', 12, 1, 1, 0, 0, 'yesno', 1, 1, '', '', '');
-INSERT INTO `layout_options` VALUES ('DEM', 'occupation', '4Employer', 'Occupation', 1, 2, 1, 20, 63, '', 1, 1, '', 'C', 'Occupation');
-INSERT INTO `layout_options` VALUES ('DEM', 'em_name', '4Employer', 'Employer Name', 2, 2, 1, 20, 63, '', 1, 1, '', 'C', 'Employer Name');
-INSERT INTO `layout_options` VALUES ('DEM', 'em_street', '4Employer', 'Employer Address', 3, 2, 1, 25, 63, '', 1, 1, '', 'C', 'Street and Number');
-INSERT INTO `layout_options` VALUES ('DEM', 'em_city', '4Employer', 'City', 4, 2, 1, 15, 63, '', 1, 1, '', 'C', 'City Name');
-INSERT INTO `layout_options` VALUES ('DEM', 'em_state', '4Employer', 'State', 5, 26, 1, 0, 0, 'state', 1, 1, '', '', 'State/Locality');
-INSERT INTO `layout_options` VALUES ('DEM', 'em_postal_code', '4Employer', 'Postal Code', 6, 2, 1, 6, 63, '', 1, 1, '', '', 'Postal Code');
-INSERT INTO `layout_options` VALUES ('DEM', 'em_country', '4Employer', 'Country', 7, 26, 1, 0, 0, 'country', 1, 1, '', '', 'Country');
-INSERT INTO `layout_options` VALUES ('DEM', 'language', '5Stats', 'Language', 1, 26, 1, 0, 0, 'language', 1, 1, '', '', 'Preferred Language');
-INSERT INTO `layout_options` VALUES ('DEM', 'ethnicity', '5Stats', 'Ethnicity', 2, 33, 1, 0, 0, 'ethnicity', 1, 1, '', '', 'Ethnicity');
-INSERT INTO `layout_options` VALUES ('DEM', 'race', '5Stats', 'Race', 3, 33, 1, 0, 0, 'race', 1, 1, '', '', 'Race');
-INSERT INTO `layout_options` VALUES ('DEM', 'financial_review', '5Stats', 'Financial Review Date', 4, 2, 1, 10, 10, '', 1, 1, '', 'D', 'Financial Review Date');
-INSERT INTO `layout_options` VALUES ('DEM', 'family_size', '5Stats', 'Family Size', 4, 2, 1, 20, 63, '', 1, 1, '', '', 'Family Size');
-INSERT INTO `layout_options` VALUES ('DEM', 'monthly_income', '5Stats', 'Monthly Income', 5, 2, 1, 20, 63, '', 1, 1, '', '', 'Monthly Income');
-INSERT INTO `layout_options` VALUES ('DEM', 'homeless', '5Stats', 'Homeless, etc.', 6, 2, 1, 20, 63, '', 1, 1, '', '', 'Homeless or similar?');
-INSERT INTO `layout_options` VALUES ('DEM', 'interpretter', '5Stats', 'Interpreter', 7, 2, 1, 20, 63, '', 1, 1, '', '', 'Interpreter needed?');
-INSERT INTO `layout_options` VALUES ('DEM', 'migrantseasonal', '5Stats', 'Migrant/Seasonal', 8, 2, 1, 20, 63, '', 1, 1, '', '', 'Migrant or seasonal worker?');
-INSERT INTO `layout_options` VALUES ('DEM', 'contrastart', '5Stats', 'Contraceptives Start',9,4,0,10,10,'',1,1,'','','Date contraceptive services initially provided');
-INSERT INTO `layout_options` VALUES ('DEM', 'referral_source', '5Stats', 'Referral Source',10, 26, 1, 0, 0, 'refsource', 1, 1, '', '', 'How did they hear about us');
-INSERT INTO `layout_options` VALUES ('DEM', 'vfc', '5Stats', 'VFC', 12, 1, 1, 20, 0, 'eligibility', 1, 1, '', '', 'Eligibility status for Vaccine for Children supplied vaccine');
-INSERT INTO `layout_options` VALUES ('DEM', 'deceased_date', '6Misc', 'Date Deceased', 1, 4, 1, 20, 20, '', 1, 3, '', 'D', 'If person is deceased, then enter date of death.');
-INSERT INTO `layout_options` VALUES ('DEM', 'deceased_reason', '6Misc', 'Reason Deceased', 2, 2, 1, 30, 255, '', 1, 3, '', '', 'Reason for Death');
-INSERT INTO `layout_options` VALUES ('DEM', 'usertext1', '6Misc', 'User Defined Text 1', 3, 2, 0, 10, 63, '', 1, 1, '', '', 'User Defined');
-INSERT INTO `layout_options` VALUES ('DEM', 'usertext2', '6Misc', 'User Defined Text 2', 4, 2, 0, 10, 63, '', 1, 1, '', '', 'User Defined');
-INSERT INTO `layout_options` VALUES ('DEM', 'usertext3', '6Misc', 'User Defined Text 3', 5,2,0,10,63,'',1,1,'','','User Defined');
-INSERT INTO `layout_options` VALUES ('DEM', 'usertext4', '6Misc', 'User Defined Text 4', 6,2,0,10,63,'',1,1,'','','User Defined');
-INSERT INTO `layout_options` VALUES ('DEM', 'usertext5', '6Misc', 'User Defined Text 5', 7,2,0,10,63,'',1,1,'','','User Defined');
-INSERT INTO `layout_options` VALUES ('DEM', 'usertext6', '6Misc', 'User Defined Text 6', 8,2,0,10,63,'',1,1,'','','User Defined');
-INSERT INTO `layout_options` VALUES ('DEM', 'usertext7', '6Misc', 'User Defined Text 7', 9,2,0,10,63,'',1,1,'','','User Defined');
-INSERT INTO `layout_options` VALUES ('DEM', 'usertext8', '6Misc', 'User Defined Text 8',10,2,0,10,63,'',1,1,'','','User Defined');
-INSERT INTO `layout_options` VALUES ('DEM', 'userlist1', '6Misc', 'User Defined List 1',11, 1, 0, 0, 0, 'userlist1', 1, 1, '', '', 'User Defined');
-INSERT INTO `layout_options` VALUES ('DEM', 'userlist2', '6Misc', 'User Defined List 2',12, 1, 0, 0, 0, 'userlist2', 1, 1, '', '', 'User Defined');
-INSERT INTO `layout_options` VALUES ('DEM', 'userlist3', '6Misc', 'User Defined List 3',13, 1, 0, 0, 0, 'userlist3', 1, 1, '', '' , 'User Defined');
-INSERT INTO `layout_options` VALUES ('DEM', 'userlist4', '6Misc', 'User Defined List 4',14, 1, 0, 0, 0, 'userlist4', 1, 1, '', '' , 'User Defined');
-INSERT INTO `layout_options` VALUES ('DEM', 'userlist5', '6Misc', 'User Defined List 5',15, 1, 0, 0, 0, 'userlist5', 1, 1, '', '' , 'User Defined');
-INSERT INTO `layout_options` VALUES ('DEM', 'userlist6', '6Misc', 'User Defined List 6',16, 1, 0, 0, 0, 'userlist6', 1, 1, '', '' , 'User Defined');
-INSERT INTO `layout_options` VALUES ('DEM', 'userlist7', '6Misc', 'User Defined List 7',17, 1, 0, 0, 0, 'userlist7', 1, 1, '', '' , 'User Defined');
-INSERT INTO `layout_options` VALUES ('DEM', 'regdate'  , '6Misc', 'Registration Date'  ,18, 4, 0,10,10, ''         , 1, 1, '', 'D', 'Start Date at This Clinic');
+INSERT INTO `layout_options` VALUES ('DEM', 'allow_imm_reg_use', '3Choices', 'Allow Immunization Registry Use', 10, 1, 1, 0, 0, 'yesno', 1, 1, '', '', '', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'allow_imm_info_share', '3Choices', 'Allow Immunization Info Sharing', 11, 1, 1, 0, 0, 'yesno', 1, 1, '', '', '', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'allow_health_info_ex', '3Choices', 'Allow Health Information Exchange', 12, 1, 1, 0, 0, 'yesno', 1, 1, '', '', '', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'allow_patient_portal', '3Choices', 'Allow Patient Portal', 13, 1, 1, 0, 0, 'yesno', 1, 1, '', '', '', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'occupation', '4Employer', 'Occupation', 1, 2, 1, 20, 63, '', 1, 1, '', 'C', 'Occupation', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'em_name', '4Employer', 'Employer Name', 2, 2, 1, 20, 63, '', 1, 1, '', 'C', 'Employer Name', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'em_street', '4Employer', 'Employer Address', 3, 2, 1, 25, 63, '', 1, 1, '', 'C', 'Street and Number', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'em_city', '4Employer', 'City', 4, 2, 1, 15, 63, '', 1, 1, '', 'C', 'City Name', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'em_state', '4Employer', 'State', 5, 26, 1, 0, 0, 'state', 1, 1, '', '', 'State/Locality', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'em_postal_code', '4Employer', 'Postal Code', 6, 2, 1, 6, 63, '', 1, 1, '', '', 'Postal Code', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'em_country', '4Employer', 'Country', 7, 26, 1, 0, 0, 'country', 1, 1, '', '', 'Country', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'language', '5Stats', 'Language', 1, 26, 1, 0, 0, 'language', 1, 1, '', '', 'Preferred Language', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'ethnicity', '5Stats', 'Ethnicity', 2, 33, 1, 0, 0, 'ethnicity', 1, 1, '', '', 'Ethnicity', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'race', '5Stats', 'Race', 3, 33, 1, 0, 0, 'race', 1, 1, '', '', 'Race', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'financial_review', '5Stats', 'Financial Review Date', 4, 2, 1, 10, 20, '', 1, 1, '', 'D', 'Financial Review Date', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'family_size', '5Stats', 'Family Size', 4, 2, 1, 20, 63, '', 1, 1, '', '', 'Family Size', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'monthly_income', '5Stats', 'Monthly Income', 5, 2, 1, 20, 63, '', 1, 1, '', '', 'Monthly Income', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'homeless', '5Stats', 'Homeless, etc.', 6, 2, 1, 20, 63, '', 1, 1, '', '', 'Homeless or similar?', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'interpretter', '5Stats', 'Interpreter', 7, 2, 1, 20, 63, '', 1, 1, '', '', 'Interpreter needed?', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'migrantseasonal', '5Stats', 'Migrant/Seasonal', 8, 2, 1, 20, 63, '', 1, 1, '', '', 'Migrant or seasonal worker?', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'contrastart', '5Stats', 'Contraceptives Start',9,4,0,10,10,'',1,1,'','','Date contraceptive services initially provided', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'referral_source', '5Stats', 'Referral Source',10, 26, 1, 0, 0, 'refsource', 1, 1, '', '', 'How did they hear about us', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'vfc', '5Stats', 'VFC', 12, 1, 1, 20, 0, 'eligibility', 1, 1, '', '', 'Eligibility status for Vaccine for Children supplied vaccine', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'deceased_date', '6Misc', 'Date Deceased', 1, 4, 1, 20, 20, '', 1, 3, '', 'D', 'If person is deceased, then enter date of death.', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'deceased_reason', '6Misc', 'Reason Deceased', 2, 2, 1, 30, 255, '', 1, 3, '', '', 'Reason for Death', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'usertext1', '6Misc', 'User Defined Text 1', 3, 2, 0, 10, 63, '', 1, 1, '', '', 'User Defined', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'usertext2', '6Misc', 'User Defined Text 2', 4, 2, 0, 10, 63, '', 1, 1, '', '', 'User Defined', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'usertext3', '6Misc', 'User Defined Text 3', 5,2,0,10,63,'',1,1,'','','User Defined', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'usertext4', '6Misc', 'User Defined Text 4', 6,2,0,10,63,'',1,1,'','','User Defined', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'usertext5', '6Misc', 'User Defined Text 5', 7,2,0,10,63,'',1,1,'','','User Defined', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'usertext6', '6Misc', 'User Defined Text 6', 8,2,0,10,63,'',1,1,'','','User Defined', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'usertext7', '6Misc', 'User Defined Text 7', 9,2,0,10,63,'',1,1,'','','User Defined', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'usertext8', '6Misc', 'User Defined Text 8',10,2,0,10,63,'',1,1,'','','User Defined', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'userlist1', '6Misc', 'User Defined List 1',11, 1, 0, 0, 0, 'userlist1', 1, 1, '', '', 'User Defined', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'userlist2', '6Misc', 'User Defined List 2',12, 1, 0, 0, 0, 'userlist2', 1, 1, '', '', 'User Defined', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'userlist3', '6Misc', 'User Defined List 3',13, 1, 0, 0, 0, 'userlist3', 1, 1, '', '' , 'User Defined', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'userlist4', '6Misc', 'User Defined List 4',14, 1, 0, 0, 0, 'userlist4', 1, 1, '', '' , 'User Defined', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'userlist5', '6Misc', 'User Defined List 5',15, 1, 0, 0, 0, 'userlist5', 1, 1, '', '' , 'User Defined', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'userlist6', '6Misc', 'User Defined List 6',16, 1, 0, 0, 0, 'userlist6', 1, 1, '', '' , 'User Defined', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'userlist7', '6Misc', 'User Defined List 7',17, 1, 0, 0, 0, 'userlist7', 1, 1, '', '' , 'User Defined', 0);
+INSERT INTO `layout_options` VALUES ('DEM', 'regdate'  , '6Misc', 'Registration Date'  ,18, 4, 0,10,10, ''         , 1, 1, '', 'D', 'Start Date at This Clinic', 0);
 
 
-INSERT INTO layout_options VALUES ('REF','refer_date'      ,'1Referral','Referral Date'                  , 1, 4,2, 0,  0,''         ,1,1,'C','D','Date of referral');
-INSERT INTO layout_options VALUES ('REF','refer_from'      ,'1Referral','Refer By'                       , 2,10,2, 0,  0,''         ,1,1,'' ,'' ,'Referral By');
-INSERT INTO layout_options VALUES ('REF','refer_external'  ,'1Referral','External Referral'              , 3, 1,1, 0,  0,'boolean'  ,1,1,'' ,'' ,'External referral?');
-INSERT INTO layout_options VALUES ('REF','refer_to'        ,'1Referral','Refer To'                       , 4,14,2, 0,  0,''         ,1,1,'' ,'' ,'Referral To');
-INSERT INTO layout_options VALUES ('REF','body'            ,'1Referral','Reason'                         , 5, 3,2,30,  3,''         ,1,1,'' ,'' ,'Reason for referral');
-INSERT INTO layout_options VALUES ('REF','refer_diag'      ,'1Referral','Referrer Diagnosis'             , 6, 2,1,30,255,''         ,1,1,'' ,'X','Referrer diagnosis');
-INSERT INTO layout_options VALUES ('REF','refer_risk_level','1Referral','Risk Level'                     , 7, 1,1, 0,  0,'risklevel',1,1,'' ,'' ,'Level of urgency');
-INSERT INTO layout_options VALUES ('REF','refer_vitals'    ,'1Referral','Include Vitals'                 , 8, 1,1, 0,  0,'boolean'  ,1,1,'' ,'' ,'Include vitals data?');
-INSERT INTO layout_options VALUES ('REF','refer_related_code','1Referral','Requested Service'            , 9,15,1,30,255,''         ,1,1,'' ,'' ,'Billing Code for Requested Service');
-INSERT INTO layout_options VALUES ('REF','reply_date'      ,'2Counter-Referral','Reply Date'             ,10, 4,1, 0,  0,''         ,1,1,'' ,'D','Date of reply');
-INSERT INTO layout_options VALUES ('REF','reply_from'      ,'2Counter-Referral','Reply From'             ,11, 2,1,30,255,''         ,1,1,'' ,'' ,'Who replied?');
-INSERT INTO layout_options VALUES ('REF','reply_init_diag' ,'2Counter-Referral','Presumed Diagnosis'     ,12, 2,1,30,255,''         ,1,1,'' ,'' ,'Presumed diagnosis by specialist');
-INSERT INTO layout_options VALUES ('REF','reply_final_diag','2Counter-Referral','Final Diagnosis'        ,13, 2,1,30,255,''         ,1,1,'' ,'' ,'Final diagnosis by specialist');
-INSERT INTO layout_options VALUES ('REF','reply_documents' ,'2Counter-Referral','Documents'              ,14, 2,1,30,255,''         ,1,1,'' ,'' ,'Where may related scanned or paper documents be found?');
-INSERT INTO layout_options VALUES ('REF','reply_findings'  ,'2Counter-Referral','Findings'               ,15, 3,1,30,  3,''         ,1,1,'' ,'' ,'Findings by specialist');
-INSERT INTO layout_options VALUES ('REF','reply_services'  ,'2Counter-Referral','Services Provided'      ,16, 3,1,30,  3,''         ,1,1,'' ,'' ,'Service provided by specialist');
-INSERT INTO layout_options VALUES ('REF','reply_recommend' ,'2Counter-Referral','Recommendations'        ,17, 3,1,30,  3,''         ,1,1,'' ,'' ,'Recommendations by specialist');
-INSERT INTO layout_options VALUES ('REF','reply_rx_refer'  ,'2Counter-Referral','Prescriptions/Referrals',18, 3,1,30,  3,''         ,1,1,'' ,'' ,'Prescriptions and/or referrals by specialist');
+INSERT INTO layout_options VALUES ('REF','refer_date'      ,'1Referral','Referral Date'                  , 1, 4,2, 0,  0,''         ,1,1,'C','D','Date of referral', 0);
+INSERT INTO layout_options VALUES ('REF','refer_from'      ,'1Referral','Refer By'                       , 2,10,2, 0,  0,''         ,1,1,'' ,'' ,'Referral By', 0);
+INSERT INTO layout_options VALUES ('REF','refer_external'  ,'1Referral','External Referral'              , 3, 1,1, 0,  0,'boolean'  ,1,1,'' ,'' ,'External referral?', 0);
+INSERT INTO layout_options VALUES ('REF','refer_to'        ,'1Referral','Refer To'                       , 4,14,2, 0,  0,''         ,1,1,'' ,'' ,'Referral To', 0);
+INSERT INTO layout_options VALUES ('REF','body'            ,'1Referral','Reason'                         , 5, 3,2,30,  0,''         ,1,1,'' ,'' ,'Reason for referral', 3);
+INSERT INTO layout_options VALUES ('REF','refer_diag'      ,'1Referral','Referrer Diagnosis'             , 6, 2,1,30,255,''         ,1,1,'' ,'X','Referrer diagnosis', 0);
+INSERT INTO layout_options VALUES ('REF','refer_risk_level','1Referral','Risk Level'                     , 7, 1,1, 0,  0,'risklevel',1,1,'' ,'' ,'Level of urgency', 0);
+INSERT INTO layout_options VALUES ('REF','refer_vitals'    ,'1Referral','Include Vitals'                 , 8, 1,1, 0,  0,'boolean'  ,1,1,'' ,'' ,'Include vitals data?', 0);
+INSERT INTO layout_options VALUES ('REF','refer_related_code','1Referral','Requested Service'            , 9,15,1,30,255,''         ,1,1,'' ,'' ,'Billing Code for Requested Service', 0);
+INSERT INTO layout_options VALUES ('REF','reply_date'      ,'2Counter-Referral','Reply Date'             ,10, 4,1, 0,  0,''         ,1,1,'' ,'D','Date of reply', 0);
+INSERT INTO layout_options VALUES ('REF','reply_from'      ,'2Counter-Referral','Reply From'             ,11, 2,1,30,255,''         ,1,1,'' ,'' ,'Who replied?', 0);
+INSERT INTO layout_options VALUES ('REF','reply_init_diag' ,'2Counter-Referral','Presumed Diagnosis'     ,12, 2,1,30,255,''         ,1,1,'' ,'' ,'Presumed diagnosis by specialist', 0);
+INSERT INTO layout_options VALUES ('REF','reply_final_diag','2Counter-Referral','Final Diagnosis'        ,13, 2,1,30,255,''         ,1,1,'' ,'' ,'Final diagnosis by specialist', 0);
+INSERT INTO layout_options VALUES ('REF','reply_documents' ,'2Counter-Referral','Documents'              ,14, 2,1,30,255,''         ,1,1,'' ,'' ,'Where may related scanned or paper documents be found?', 0);
+INSERT INTO layout_options VALUES ('REF','reply_findings'  ,'2Counter-Referral','Findings'               ,15, 3,1,30,  0,''         ,1,1,'' ,'' ,'Findings by specialist', 3);
+INSERT INTO layout_options VALUES ('REF','reply_services'  ,'2Counter-Referral','Services Provided'      ,16, 3,1,30,  0,''         ,1,1,'' ,'' ,'Service provided by specialist', 3);
+INSERT INTO layout_options VALUES ('REF','reply_recommend' ,'2Counter-Referral','Recommendations'        ,17, 3,1,30,  0,''         ,1,1,'' ,'' ,'Recommendations by specialist', 3);
+INSERT INTO layout_options VALUES ('REF','reply_rx_refer'  ,'2Counter-Referral','Prescriptions/Referrals',18, 3,1,30,  0,''         ,1,1,'' ,'' ,'Prescriptions and/or referrals by specialist', 3);
 
-INSERT INTO layout_options VALUES ('HIS','usertext11','1General','Risk Factors',1,21,1,0,0,'riskfactors',1,1,'','' ,'Risk Factors');
-INSERT INTO layout_options VALUES ('HIS','exams'     ,'1General','Exams/Tests' ,2,23,1,0,0,'exams'      ,1,1,'','' ,'Exam and test results');
-INSERT INTO layout_options VALUES ('HIS','history_father'   ,'2Family History','Father'   ,1, 2,1,20,255,'',1,1,'','' ,'');
-INSERT INTO layout_options VALUES ('HIS','history_mother'   ,'2Family History','Mother'   ,2, 2,1,20,255,'',1,1,'','' ,'');
-INSERT INTO layout_options VALUES ('HIS','history_siblings' ,'2Family History','Siblings' ,3, 2,1,20,255,'',1,1,'','' ,'');
-INSERT INTO layout_options VALUES ('HIS','history_spouse'   ,'2Family History','Spouse'   ,4, 2,1,20,255,'',1,1,'','' ,'');
-INSERT INTO layout_options VALUES ('HIS','history_offspring','2Family History','Offspring',5, 2,1,20,255,'',1,3,'','' ,'');
-INSERT INTO layout_options VALUES ('HIS','relatives_cancer'             ,'3Relatives','Cancer'             ,1, 2,1,20,255,'',1,1,'','' ,'');
-INSERT INTO layout_options VALUES ('HIS','relatives_tuberculosis'       ,'3Relatives','Tuberculosis'       ,2, 2,1,20,255,'',1,1,'','' ,'');
-INSERT INTO layout_options VALUES ('HIS','relatives_diabetes'           ,'3Relatives','Diabetes'           ,3, 2,1,20,255,'',1,1,'','' ,'');
-INSERT INTO layout_options VALUES ('HIS','relatives_high_blood_pressure','3Relatives','High Blood Pressure',4, 2,1,20,255,'',1,1,'','' ,'');
-INSERT INTO layout_options VALUES ('HIS','relatives_heart_problems'     ,'3Relatives','Heart Problems'     ,5, 2,1,20,255,'',1,1,'','' ,'');
-INSERT INTO layout_options VALUES ('HIS','relatives_stroke'             ,'3Relatives','Stroke'             ,6, 2,1,20,255,'',1,1,'','' ,'');
-INSERT INTO layout_options VALUES ('HIS','relatives_epilepsy'           ,'3Relatives','Epilepsy'           ,7, 2,1,20,255,'',1,1,'','' ,'');
-INSERT INTO layout_options VALUES ('HIS','relatives_mental_illness'     ,'3Relatives','Mental Illness'     ,8, 2,1,20,255,'',1,1,'','' ,'');
-INSERT INTO layout_options VALUES ('HIS','relatives_suicide'            ,'3Relatives','Suicide'            ,9, 2,1,20,255,'',1,3,'','' ,'');
-INSERT INTO layout_options VALUES ('HIS','coffee'              ,'4Lifestyle','Coffee'              ,2,28,1,20,255,'',1,3,'','' ,'Caffeine consumption');
-INSERT INTO layout_options VALUES ('HIS','tobacco'             ,'4Lifestyle','Tobacco'             ,1,32,1,0,255,'smoking_status',1,3,'','' ,'Tobacco use');
-INSERT INTO layout_options VALUES ('HIS','alcohol'             ,'4Lifestyle','Alcohol'             ,3,28,1,20,255,'',1,3,'','' ,'Alcohol consumption');
-INSERT INTO layout_options VALUES ('HIS','recreational_drugs'  ,'4Lifestyle','Recreational Drugs'  ,4,28,1,20,255,'',1,3,'','' ,'Recreational drug use');
-INSERT INTO layout_options VALUES ('HIS','counseling'          ,'4Lifestyle','Counseling'          ,5,28,1,20,255,'',1,3,'','' ,'Counseling activities');
-INSERT INTO layout_options VALUES ('HIS','exercise_patterns'   ,'4Lifestyle','Exercise Patterns'   ,6,28,1,20,255,'',1,3,'','' ,'Exercise patterns');
-INSERT INTO layout_options VALUES ('HIS','hazardous_activities','4Lifestyle','Hazardous Activities',7,28,1,20,255,'',1,3,'','' ,'Hazardous activities');
-INSERT INTO layout_options VALUES ('HIS','sleep_patterns'      ,'4Lifestyle','Sleep Patterns'      ,8, 2,1,20,255,'',1,3,'','' ,'Sleep patterns');
-INSERT INTO layout_options VALUES ('HIS','seatbelt_use'        ,'4Lifestyle','Seatbelt Use'        ,9, 2,1,20,255,'',1,3,'','' ,'Seatbelt use');
-INSERT INTO layout_options VALUES ('HIS','name_1'            ,'5Other','Name/Value'        ,1, 2,1,10,255,'',1,1,'','' ,'Name 1' );
-INSERT INTO layout_options VALUES ('HIS','value_1'           ,'5Other',''                  ,2, 2,1,10,255,'',0,0,'','' ,'Value 1');
-INSERT INTO layout_options VALUES ('HIS','name_2'            ,'5Other','Name/Value'        ,3, 2,1,10,255,'',1,1,'','' ,'Name 2' );
-INSERT INTO layout_options VALUES ('HIS','value_2'           ,'5Other',''                  ,4, 2,1,10,255,'',0,0,'','' ,'Value 2');
-INSERT INTO layout_options VALUES ('HIS','additional_history','5Other','Additional History',5, 3,1,30,  3,'',1,3,'' ,'' ,'Additional history notes');
-INSERT INTO layout_options VALUES ('HIS','userarea11'        ,'5Other','User Defined Area 11',6,3,0,30,3,'',1,3,'','','User Defined');
-INSERT INTO layout_options VALUES ('HIS','userarea12'        ,'5Other','User Defined Area 12',7,3,0,30,3,'',1,3,'','','User Defined');
+INSERT INTO layout_options VALUES ('HIS','usertext11','1General','Risk Factors',1,21,1,0,0,'riskfactors',1,1,'','' ,'Risk Factors', 0);
+INSERT INTO layout_options VALUES ('HIS','exams'     ,'1General','Exams/Tests' ,2,23,1,0,0,'exams'      ,1,1,'','' ,'Exam and test results', 0);
+INSERT INTO layout_options VALUES ('HIS','history_father'   ,'2Family History','Father'   ,1, 2,1,20,0,'',1,1,'','' ,'', 0);
+INSERT INTO layout_options VALUES ('HIS','history_mother'   ,'2Family History','Mother'   ,2, 2,1,20,0,'',1,1,'','' ,'', 0);
+INSERT INTO layout_options VALUES ('HIS','history_siblings' ,'2Family History','Siblings' ,3, 2,1,20,0,'',1,1,'','' ,'', 0);
+INSERT INTO layout_options VALUES ('HIS','history_spouse'   ,'2Family History','Spouse'   ,4, 2,1,20,0,'',1,1,'','' ,'', 0);
+INSERT INTO layout_options VALUES ('HIS','history_offspring','2Family History','Offspring',5, 2,1,20,0,'',1,3,'','' ,'', 0);
+INSERT INTO layout_options VALUES ('HIS','relatives_cancer'             ,'3Relatives','Cancer'             ,1, 2,1,20,0,'',1,1,'','' ,'', 0);
+INSERT INTO layout_options VALUES ('HIS','relatives_tuberculosis'       ,'3Relatives','Tuberculosis'       ,2, 2,1,20,0,'',1,1,'','' ,'', 0);
+INSERT INTO layout_options VALUES ('HIS','relatives_diabetes'           ,'3Relatives','Diabetes'           ,3, 2,1,20,0,'',1,1,'','' ,'', 0);
+INSERT INTO layout_options VALUES ('HIS','relatives_high_blood_pressure','3Relatives','High Blood Pressure',4, 2,1,20,0,'',1,1,'','' ,'', 0);
+INSERT INTO layout_options VALUES ('HIS','relatives_heart_problems'     ,'3Relatives','Heart Problems'     ,5, 2,1,20,0,'',1,1,'','' ,'', 0);
+INSERT INTO layout_options VALUES ('HIS','relatives_stroke'             ,'3Relatives','Stroke'             ,6, 2,1,20,0,'',1,1,'','' ,'', 0);
+INSERT INTO layout_options VALUES ('HIS','relatives_epilepsy'           ,'3Relatives','Epilepsy'           ,7, 2,1,20,0,'',1,1,'','' ,'', 0);
+INSERT INTO layout_options VALUES ('HIS','relatives_mental_illness'     ,'3Relatives','Mental Illness'     ,8, 2,1,20,0,'',1,1,'','' ,'', 0);
+INSERT INTO layout_options VALUES ('HIS','relatives_suicide'            ,'3Relatives','Suicide'            ,9, 2,1,20,0,'',1,3,'','' ,'', 0);
+INSERT INTO layout_options VALUES ('HIS','coffee'              ,'4Lifestyle','Coffee'              ,2,28,1,20,0,'',1,3,'','' ,'Caffeine consumption', 0);
+INSERT INTO layout_options VALUES ('HIS','tobacco'             ,'4Lifestyle','Tobacco'             ,1,32,1,0,0,'smoking_status',1,3,'','' ,'Tobacco use', 0);
+INSERT INTO layout_options VALUES ('HIS','alcohol'             ,'4Lifestyle','Alcohol'             ,3,28,1,20,0,'',1,3,'','' ,'Alcohol consumption', 0);
+INSERT INTO layout_options VALUES ('HIS','recreational_drugs'  ,'4Lifestyle','Recreational Drugs'  ,4,28,1,20,0,'',1,3,'','' ,'Recreational drug use', 0);
+INSERT INTO layout_options VALUES ('HIS','counseling'          ,'4Lifestyle','Counseling'          ,5,28,1,20,0,'',1,3,'','' ,'Counseling activities', 0);
+INSERT INTO layout_options VALUES ('HIS','exercise_patterns'   ,'4Lifestyle','Exercise Patterns'   ,6,28,1,20,0,'',1,3,'','' ,'Exercise patterns', 0);
+INSERT INTO layout_options VALUES ('HIS','hazardous_activities','4Lifestyle','Hazardous Activities',7,28,1,20,0,'',1,3,'','' ,'Hazardous activities', 0);
+INSERT INTO layout_options VALUES ('HIS','sleep_patterns'      ,'4Lifestyle','Sleep Patterns'      ,8, 2,1,20,0,'',1,3,'','' ,'Sleep patterns', 0);
+INSERT INTO layout_options VALUES ('HIS','seatbelt_use'        ,'4Lifestyle','Seatbelt Use'        ,9, 2,1,20,0,'',1,3,'','' ,'Seatbelt use', 0);
+INSERT INTO layout_options VALUES ('HIS','name_1'            ,'5Other','Name/Value'        ,1, 2,1,10,255,'',1,1,'','' ,'Name 1', 0);
+INSERT INTO layout_options VALUES ('HIS','value_1'           ,'5Other',''                  ,2, 2,1,10,255,'',0,0,'','' ,'Value 1', 0);
+INSERT INTO layout_options VALUES ('HIS','name_2'            ,'5Other','Name/Value'        ,3, 2,1,10,255,'',1,1,'','' ,'Name 2', 0);
+INSERT INTO layout_options VALUES ('HIS','value_2'           ,'5Other',''                  ,4, 2,1,10,255,'',0,0,'','' ,'Value 2', 0);
+INSERT INTO layout_options VALUES ('HIS','additional_history','5Other','Additional History',5, 3,1,30,  0,'',1,3,'' ,'' ,'Additional history notes', 3);
+INSERT INTO layout_options VALUES ('HIS','userarea11'        ,'5Other','User Defined Area 11',6,3,0,30,0,'',1,3,'','','User Defined', 3);
+INSERT INTO layout_options VALUES ('HIS','userarea12'        ,'5Other','User Defined Area 12',7,3,0,30,0,'',1,3,'','','User Defined', 3);
+
+INSERT INTO `layout_options` VALUES ('FACUSR', 'provider_id', '1General', 'Provider ID', 1, 2, 1, 15, 63, '', 1, 1, '', '', 'Provider ID at Specified Facility', 0);
 
 -- --------------------------------------------------------
 
@@ -2295,6 +2542,7 @@ CREATE TABLE `list_options` (
   `option_value` float NOT NULL default '0',
   `mapping` varchar(31) NOT NULL DEFAULT '',
   `notes` varchar(255) NOT NULL DEFAULT '',
+  `codes` varchar(255) NOT NULL DEFAULT '',
   PRIMARY KEY  (`list_id`,`option_id`)
 ) ENGINE=MyISAM;
 
@@ -3270,6 +3518,13 @@ INSERT INTO `list_options` (`list_id`, `option_id`, `title`, `seq`) VALUES ('nat
 insert into `list_options` (`list_id`, `option_id`, `title`, `seq`, `is_default`, `option_value`, `mapping`, `notes`) values('lists','payment_gateways','Payment Gateways','297','1','0','','');
 insert into `list_options` (`list_id`, `option_id`, `title`, `seq`, `is_default`, `option_value`, `mapping`, `notes`) values('payment_gateways','authorize_net','Authorize.net','1','0','0','','');
 
+insert into list_options (list_id, option_id, title, seq, option_value, mapping, notes) values('lists','ptlistcols','Patient List Columns','1','0','','');
+insert into list_options (list_id, option_id, title, seq, option_value, mapping, notes) values('ptlistcols','name'      ,'Full Name'     ,'10','3','','');
+insert into list_options (list_id, option_id, title, seq, option_value, mapping, notes) values('ptlistcols','phone_home','Home Phone'    ,'20','3','','');
+insert into list_options (list_id, option_id, title, seq, option_value, mapping, notes) values('ptlistcols','ss'        ,'SSN'           ,'30','3','','');
+insert into list_options (list_id, option_id, title, seq, option_value, mapping, notes) values('ptlistcols','DOB'       ,'Date of Birth' ,'40','3','','');
+insert into list_options (list_id, option_id, title, seq, option_value, mapping, notes) values('ptlistcols','pubpid'    ,'External ID'   ,'50','3','','');
+
 -- --------------------------------------------------------
 
 -- 
@@ -3345,6 +3600,7 @@ CREATE TABLE `log` (
   `crt_user` varchar(255) default NULL,
   PRIMARY KEY  (`id`)
 ) ENGINE=MyISAM AUTO_INCREMENT=1 ;
+
 
 -- --------------------------------------------------------
 
@@ -3538,7 +3794,8 @@ CREATE TABLE `openemr_postcalendar_events` (
   `pc_sendalertemail` VARCHAR( 3 ) NOT NULL DEFAULT 'NO',
   `pc_billing_location` SMALLINT (6) NOT NULL DEFAULT '0',
   PRIMARY KEY  (`pc_eid`),
-  KEY `basic_event` (`pc_catid`,`pc_aid`,`pc_eventDate`,`pc_endDate`,`pc_eventstatus`,`pc_sharing`,`pc_topic`)
+  KEY `basic_event` (`pc_catid`,`pc_aid`,`pc_eventDate`,`pc_endDate`,`pc_eventstatus`,`pc_sharing`,`pc_topic`),
+  KEY `pc_eventDate` (`pc_eventDate`)
 ) ENGINE=MyISAM AUTO_INCREMENT=7 ;
 
 -- 
@@ -3656,6 +3913,7 @@ CREATE TABLE `patient_data` (
   `referrer` varchar(255) NOT NULL default '',
   `referrerID` varchar(255) NOT NULL default '',
   `providerID` int(11) default NULL,
+  `ref_providerID` int(11) default NULL,
   `email` varchar(255) NOT NULL default '',
   `ethnoracial` varchar(255) NOT NULL default '',
   `race` varchar(255) NOT NULL default '',
@@ -4073,6 +4331,20 @@ INSERT INTO `registry` VALUES ('Review Of Systems', 1, 'ros', 13, 1, 1, '2005-03
 INSERT INTO `registry` VALUES ('Fee Sheet', 1, 'fee_sheet', 14, 1, 1, '2007-07-28 00:00:00', 0, 'Administrative', '');
 INSERT INTO `registry` VALUES ('Misc Billing Options HCFA', 1, 'misc_billing_options', 15, 1, 1, '2007-07-28 00:00:00', 0, 'Administrative', '');
 INSERT INTO `registry` VALUES ('Procedure Order', 1, 'procedure_order', 16, 1, 1, '2010-02-25 00:00:00', 0, 'Administrative', '');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `report_results`
+--
+
+DROP TABLE IF EXISTS `report_results`;
+CREATE TABLE `report_results` (
+  `report_id` bigint(20) NOT NULL,
+  `field_id` varchar(31) NOT NULL default '',
+  `field_value` text,
+  PRIMARY KEY (`report_id`,`field_id`)
+) ENGINE=MyISAM;
 
 -- --------------------------------------------------------
 
@@ -4703,6 +4975,41 @@ INSERT INTO `sequences` VALUES (1);
 
 -- --------------------------------------------------------
 
+--
+-- Table structure for table `supported_external_dataloads`
+--
+
+DROP TABLE IF EXISTS `supported_external_dataloads`;
+CREATE TABLE `supported_external_dataloads` (
+  `load_id` SERIAL,
+  `load_type` varchar(24) NOT NULL DEFAULT '',
+  `load_source` varchar(24) NOT NULL DEFAULT 'CMS',
+  `load_release_date` date NOT NULL,
+  `load_filename` varchar(256) NOT NULL DEFAULT '',
+  `load_checksum` varchar(32) NOT NULL DEFAULT ''
+) ENGINE=MyISAM;
+
+--
+-- Dumping data for table `supported_external_dataloads`
+--
+
+INSERT INTO `supported_external_dataloads` (`load_type`, `load_source`, `load_release_date`, `load_filename`, `load_checksum`) VALUES
+('ICD9', 'CMS', '2011-10-01', 'cmsv29_master_descriptions.zip', 'c360c2b5a29974d6c58617c7378dd7c4');
+INSERT INTO `supported_external_dataloads` (`load_type`, `load_source`, `load_release_date`, `load_filename`, `load_checksum`) VALUES
+('ICD9', 'CMS', '2012-10-01', 'cmsv30_master_descriptions.zip', 'eb26446536435f5f5e677090a7976b15');
+INSERT INTO `supported_external_dataloads` (`load_type`, `load_source`, `load_release_date`, `load_filename`, `load_checksum`) VALUES
+('ICD10', 'CMS', '2011-10-01', '2012_PCS_long_and_abbreviated_titles.zip', '201a732b649d8c7fba807cc4c083a71a');
+INSERT INTO `supported_external_dataloads` (`load_type`, `load_source`, `load_release_date`, `load_filename`, `load_checksum`) VALUES
+('ICD10', 'CMS', '2011-10-01', 'DiagnosisGEMs_2012.zip', '6758c4a3384c47161ce24f13a2464b53');
+INSERT INTO `supported_external_dataloads` (`load_type`, `load_source`, `load_release_date`, `load_filename`, `load_checksum`) VALUES
+('ICD10', 'CMS', '2011-10-01', 'ICD10OrderFiles_2012.zip', 'a76601df7a9f5270d8229828a833f6a1');
+INSERT INTO `supported_external_dataloads` (`load_type`, `load_source`, `load_release_date`, `load_filename`, `load_checksum`) VALUES
+('ICD10', 'CMS', '2011-10-01', 'ProcedureGEMs_2012.zip', 'f37416d8fab6cd2700b634ca5025295d');
+INSERT INTO `supported_external_dataloads` (`load_type`, `load_source`, `load_release_date`, `load_filename`, `load_checksum`) VALUES
+('ICD10', 'CMS', '2011-10-01', 'ReimbursementMapping_2012.zip', '8b438d1fd1f34a9bb0e423c15e89744b');
+
+-- --------------------------------------------------------
+
 -- 
 -- Table structure for table `transactions`
 -- 
@@ -4856,6 +5163,10 @@ CREATE TABLE `x12_partners` (
   `x12_receiver_id` varchar(255) default NULL,
   `x12_version` varchar(255) default NULL,
   `processing_format` enum('standard','medi-cal','cms','proxymed') default NULL,
+  `x12_isa01` VARCHAR( 2 ) NOT NULL DEFAULT '00' COMMENT 'User logon Required Indicator',
+  `x12_isa02` VARCHAR( 10 ) NOT NULL DEFAULT '          ' COMMENT 'User Logon',
+  `x12_isa03` VARCHAR( 2 ) NOT NULL DEFAULT '00' COMMENT 'User password required Indicator',
+  `x12_isa04` VARCHAR( 10 ) NOT NULL DEFAULT '          ' COMMENT 'User Password',
   `x12_isa05` char(2)     NOT NULL DEFAULT 'ZZ',
   `x12_isa07` char(2)     NOT NULL DEFAULT 'ZZ',
   `x12_isa14` char(1)     NOT NULL DEFAULT '0',
@@ -4866,7 +5177,7 @@ CREATE TABLE `x12_partners` (
   PRIMARY KEY  (`id`)
 ) ENGINE=MyISAM;
 
-------------------------------------------------------------------------------------- 
+-- -----------------------------------------------------------------------------------
 -- Table structure for table `automatic_notification`
 -- 
 
@@ -4979,8 +5290,9 @@ CREATE TABLE ar_activity (
   pid            int(11)       NOT NULL,
   encounter      int(11)       NOT NULL,
   sequence_no    int unsigned  NOT NULL AUTO_INCREMENT,
-  code           varchar(9)    NOT NULL            COMMENT 'empty means claim level',
-  modifier       varchar(5)    NOT NULL DEFAULT '',
+  `code_type`    varchar(12)   NOT NULL DEFAULT '',
+  code           varchar(20)   NOT NULL            COMMENT 'empty means claim level',
+  modifier       varchar(12)   NOT NULL DEFAULT '',
   payer_type     int           NOT NULL            COMMENT '0=pt, 1=ins1, 2=ins2, etc',
   post_time      datetime      NOT NULL,
   post_user      int(11)       NOT NULL            COMMENT 'references users.id',
@@ -5020,11 +5332,30 @@ CREATE TABLE gprelations (
   KEY key2  (type2,id2)
 ) ENGINE=MyISAM COMMENT='general purpose relations';
 
+CREATE TABLE `procedure_providers` (
+  `ppid`         bigint(20)   NOT NULL auto_increment,
+  `name`         varchar(255) NOT NULL DEFAULT '',
+  `npi`          varchar(15)  NOT NULL DEFAULT '',
+  `send_app_id`  varchar(255) NOT NULL DEFAULT ''  COMMENT 'Sending application ID (MSH-3.1)',
+  `send_fac_id`  varchar(255) NOT NULL DEFAULT ''  COMMENT 'Sending facility ID (MSH-4.1)',
+  `recv_app_id`  varchar(255) NOT NULL DEFAULT ''  COMMENT 'Receiving application ID (MSH-5.1)',
+  `recv_fac_id`  varchar(255) NOT NULL DEFAULT ''  COMMENT 'Receiving facility ID (MSH-6.1)',
+  `DorP`         char(1)      NOT NULL DEFAULT 'D' COMMENT 'Debugging or Production (MSH-11)',
+  `protocol`     varchar(15)  NOT NULL DEFAULT 'DL',
+  `remote_host`  varchar(255) NOT NULL DEFAULT '',
+  `login`        varchar(255) NOT NULL DEFAULT '',
+  `password`     varchar(255) NOT NULL DEFAULT '',
+  `orders_path`  varchar(255) NOT NULL DEFAULT '',
+  `results_path` varchar(255) NOT NULL DEFAULT '',
+  `notes`        text         NOT NULL DEFAULT '',
+  PRIMARY KEY (`ppid`)
+) ENGINE=MyISAM;
+
 CREATE TABLE `procedure_type` (
   `procedure_type_id`   bigint(20)   NOT NULL AUTO_INCREMENT,
   `parent`              bigint(20)   NOT NULL DEFAULT 0  COMMENT 'references procedure_type.procedure_type_id',
   `name`                varchar(63)  NOT NULL DEFAULT '' COMMENT 'name for this category, procedure or result type',
-  `lab_id`              bigint(20)   NOT NULL DEFAULT 0  COMMENT 'references users.id, 0 means default to parent',
+  `lab_id`              bigint(20)   NOT NULL DEFAULT 0  COMMENT 'references procedure_providers.ppid, 0 means default to parent',
   `procedure_code`      varchar(31)  NOT NULL DEFAULT '' COMMENT 'code identifying this procedure',
   `procedure_type`      varchar(31)  NOT NULL DEFAULT '' COMMENT 'see list proc_type',
   `body_site`           varchar(31)  NOT NULL DEFAULT '' COMMENT 'where to do injection, e.g. arm, buttok',
@@ -5037,37 +5368,78 @@ CREATE TABLE `procedure_type` (
   `units`               varchar(31)  NOT NULL DEFAULT '' COMMENT 'default for procedure_result.units',
   `range`               varchar(255) NOT NULL DEFAULT '' COMMENT 'default for procedure_result.range',
   `seq`                 int(11)      NOT NULL default 0  COMMENT 'sequence number for ordering',
+  `activity`            tinyint(1)   NOT NULL default 1  COMMENT '1=active, 0=inactive',
+  `notes`               varchar(255) NOT NULL default '' COMMENT 'additional notes to enhance description',
   PRIMARY KEY (`procedure_type_id`),
   KEY parent (parent)
 ) ENGINE=MyISAM;
 
+CREATE TABLE `procedure_questions` (
+  `lab_id`              bigint(20)   NOT NULL DEFAULT 0   COMMENT 'references procedure_providers.ppid to identify the lab',
+  `procedure_code`      varchar(31)  NOT NULL DEFAULT ''  COMMENT 'references procedure_type.procedure_code to identify this order type',
+  `question_code`       varchar(31)  NOT NULL DEFAULT ''  COMMENT 'code identifying this question',
+  `seq`                 int(11)      NOT NULL default 0   COMMENT 'sequence number for ordering',
+  `question_text`       varchar(255) NOT NULL DEFAULT ''  COMMENT 'descriptive text for question_code',
+  `required`            tinyint(1)   NOT NULL DEFAULT 0   COMMENT '1 = required, 0 = not',
+  `maxsize`             int          NOT NULL DEFAULT 0   COMMENT 'maximum length if text input field',
+  `fldtype`             char(1)      NOT NULL DEFAULT 'T' COMMENT 'Text, Number, Select, Multiselect, Date, Gestational-age',
+  `options`             text         NOT NULL DEFAULT ''  COMMENT 'choices for fldtype S and T',
+  `tips`                varchar(255) NOT NULL DEFAULT ''  COMMENT 'Additional instructions for answering the question',
+  `activity`            tinyint(1)   NOT NULL DEFAULT 1   COMMENT '1 = active, 0 = inactive',
+  PRIMARY KEY (`lab_id`, `procedure_code`, `question_code`)
+) ENGINE=MyISAM;
+
 CREATE TABLE `procedure_order` (
   `procedure_order_id`     bigint(20)   NOT NULL AUTO_INCREMENT,
-  `procedure_type_id`      bigint(20)   NOT NULL            COMMENT 'references procedure_type.procedure_type_id',
-  `provider_id`            bigint(20)   NOT NULL DEFAULT 0  COMMENT 'references users.id',
+  `provider_id`            bigint(20)   NOT NULL DEFAULT 0  COMMENT 'references users.id, the ordering provider',
   `patient_id`             bigint(20)   NOT NULL            COMMENT 'references patient_data.pid',
   `encounter_id`           bigint(20)   NOT NULL DEFAULT 0  COMMENT 'references form_encounter.encounter',
   `date_collected`         datetime     DEFAULT NULL        COMMENT 'time specimen collected',
   `date_ordered`           date         DEFAULT NULL,
   `order_priority`         varchar(31)  NOT NULL DEFAULT '',
   `order_status`           varchar(31)  NOT NULL DEFAULT '' COMMENT 'pending,routed,complete,canceled',
+  `diagnoses`              text         NOT NULL DEFAULT '' COMMENT 'diagnoses and maybe other coding (e.g. ICD9:111.11)',
   `patient_instructions`   text         NOT NULL DEFAULT '',
   `activity`               tinyint(1)   NOT NULL DEFAULT 1  COMMENT '0 if deleted',
   `control_id`             bigint(20)   NOT NULL            COMMENT 'This is the CONTROL ID that is sent back from lab',
+  `lab_id`                 bigint(20)   NOT NULL DEFAULT 0  COMMENT 'references procedure_providers.ppid',
+  `specimen_type`          varchar(31)  NOT NULL DEFAULT '' COMMENT 'from the Specimen_Type list',
+  `specimen_location`      varchar(31)  NOT NULL DEFAULT '' COMMENT 'from the Specimen_Location list',
+  `specimen_volume`        varchar(30)  NOT NULL DEFAULT '' COMMENT 'from a text input field',
   PRIMARY KEY (`procedure_order_id`),
   KEY datepid (date_ordered, patient_id),
   KEY `patient_id` (`patient_id`)
 ) ENGINE=MyISAM;
 
+CREATE TABLE `procedure_order_code` (
+  `procedure_order_id`  bigint(20)  NOT NULL                COMMENT 'references procedure_order.procedure_order_id',
+  `procedure_order_seq` int(11)     NOT NULL AUTO_INCREMENT COMMENT 'supports multiple tests per order',
+  `procedure_code`      varchar(31) NOT NULL DEFAULT ''     COMMENT 'like procedure_type.procedure_code',
+  `procedure_name`      varchar(255) NOT NULL DEFAULT ''    COMMENT 'descriptive name of the procedure code',
+  `procedure_source`    char(1)     NOT NULL DEFAULT '1'    COMMENT '1=original order, 2=added after order sent',
+  PRIMARY KEY (`procedure_order_id`, `procedure_order_seq`)
+) ENGINE=MyISAM;
+
+CREATE TABLE `procedure_answers` (
+  `procedure_order_id`  bigint(20)   NOT NULL DEFAULT 0  COMMENT 'references procedure_order.procedure_order_id',
+  `procedure_order_seq` int(11)      NOT NULL DEFAULT 0  COMMENT 'references procedure_order_code.procedure_order_seq',
+  `question_code`       varchar(31)  NOT NULL DEFAULT '' COMMENT 'references procedure_questions.question_code',
+  `answer_seq`          int(11)      NOT NULL AUTO_INCREMENT COMMENT 'supports multiple-choice questions',
+  `answer`              varchar(255) NOT NULL DEFAULT '' COMMENT 'answer data',
+  PRIMARY KEY (`procedure_order_id`, `procedure_order_seq`, `question_code`, `answer_seq`)
+) ENGINE=MyISAM;
+
 CREATE TABLE `procedure_report` (
   `procedure_report_id` bigint(20)     NOT NULL AUTO_INCREMENT,
   `procedure_order_id`  bigint(20)     DEFAULT NULL   COMMENT 'references procedure_order.procedure_order_id',
+  `procedure_order_seq` int(11)        NOT NULL DEFAULT 1  COMMENT 'references procedure_order_code.procedure_order_seq',
   `date_collected`      datetime       DEFAULT NULL,
   `date_report`         date           DEFAULT NULL,
   `source`              bigint(20)     NOT NULL DEFAULT 0  COMMENT 'references users.id, who entered this data',
   `specimen_num`        varchar(63)    NOT NULL DEFAULT '',
   `report_status`       varchar(31)    NOT NULL DEFAULT '' COMMENT 'received,complete,error',
-  `review_status`       varchar(31)    NOT NULL DEFAULT 'received' COMMENT 'panding reivew status: received,reviewed',  
+  `review_status`       varchar(31)    NOT NULL DEFAULT 'received' COMMENT 'pending review status: received,reviewed',  
+  `report_notes`        text           NOT NULL DEFAULT '' COMMENT 'notes from the lab',
   PRIMARY KEY (`procedure_report_id`),
   KEY procedure_order_id (procedure_order_id)
 ) ENGINE=MyISAM; 
@@ -5075,7 +5447,9 @@ CREATE TABLE `procedure_report` (
 CREATE TABLE `procedure_result` (
   `procedure_result_id` bigint(20)   NOT NULL AUTO_INCREMENT,
   `procedure_report_id` bigint(20)   NOT NULL            COMMENT 'references procedure_report.procedure_report_id',
-  `procedure_type_id`   bigint(20)   NOT NULL            COMMENT 'references procedure_type.procedure_type_id',
+  `result_data_type`    char(1)      NOT NULL DEFAULT 'S' COMMENT 'N=Numeric, S=String, F=Formatted, E=External, L=Long text as first line of comments',
+  `result_code`         varchar(31)  NOT NULL DEFAULT '' COMMENT 'LOINC code, might match a procedure_type.procedure_code',
+  `result_text`         varchar(255) NOT NULL DEFAULT '' COMMENT 'Description of result_code',
   `date`                datetime     DEFAULT NULL        COMMENT 'lab-provided date specific to this result',
   `facility`            varchar(255) NOT NULL DEFAULT '' COMMENT 'lab-provided testing facility ID',
   `units`               varchar(31)  NOT NULL DEFAULT '',
@@ -5110,15 +5484,23 @@ CREATE TABLE code_types (
   ct_active tinyint(1) NOT NULL default 1 COMMENT '1 if this is active',
   ct_label varchar(31) NOT NULL default '' COMMENT 'label of this code type',
   ct_external tinyint(1) NOT NULL default 0 COMMENT '0 if stored codes in codes tables, 1 or greater if codes stored in external tables',
+  ct_claim tinyint(1) NOT NULL default 0 COMMENT '1 if this is used in claims',
+  ct_proc tinyint(1) NOT NULL default 0 COMMENT '1 if this is a procedure type',
+  ct_term tinyint(1) NOT NULL default 0 COMMENT '1 if this is a clinical term',
   PRIMARY KEY (ct_key)
 ) ENGINE=MyISAM;
-INSERT INTO code_types (ct_key, ct_id, ct_seq, ct_mod, ct_just, ct_fee, ct_rel, ct_nofs, ct_diag, ct_active, ct_label, ct_external ) VALUES ('ICD9' , 2, 1, 2, ''    , 0, 0, 0, 1, 1, 'ICD9', 0);
-INSERT INTO code_types (ct_key, ct_id, ct_seq, ct_mod, ct_just, ct_fee, ct_rel, ct_nofs, ct_diag, ct_active, ct_label, ct_external ) VALUES ('CPT4' , 1, 2, 12, 'ICD9', 1, 0, 0, 0, 1, 'CPT4', 0);
-INSERT INTO code_types (ct_key, ct_id, ct_seq, ct_mod, ct_just, ct_fee, ct_rel, ct_nofs, ct_diag, ct_active, ct_label, ct_external ) VALUES ('HCPCS', 3, 3, 12, 'ICD9', 1, 0, 0, 0, 1, 'HCPCS', 0);
-INSERT INTO code_types (ct_key, ct_id, ct_seq, ct_mod, ct_just, ct_fee, ct_rel, ct_nofs, ct_diag, ct_active, ct_label, ct_external ) VALUES ('CVX'  , 100, 100, 0, '', 0, 0, 1, 0, 1, 'CVX', 0);
-INSERT INTO code_types (ct_key, ct_id, ct_seq, ct_mod, ct_just, ct_fee, ct_rel, ct_nofs, ct_diag, ct_active, ct_label, ct_external ) VALUES ('DSMIV' , 101, 101, 2, '', 0, 0, 0, 1, 0, 'DSMIV', 0);
-INSERT INTO code_types (ct_key, ct_id, ct_seq, ct_mod, ct_just, ct_fee, ct_rel, ct_nofs, ct_diag, ct_active, ct_label, ct_external ) VALUES ('ICD10' , 102, 102, 2, '', 0, 0, 0, 1, 0, 'ICD10', 1);
-INSERT INTO code_types (ct_key, ct_id, ct_seq, ct_mod, ct_just, ct_fee, ct_rel, ct_nofs, ct_diag, ct_active, ct_label, ct_external ) VALUES ('SNOMED' , 103, 103, 2, '', 0, 0, 0, 1, 0, 'SNOMED', 2);
+
+INSERT INTO code_types (ct_key, ct_id, ct_seq, ct_mod, ct_just, ct_fee, ct_rel, ct_nofs, ct_diag, ct_active, ct_label, ct_external, ct_claim, ct_proc, ct_term ) VALUES ('ICD9' , 2, 1, 0, ''    , 0, 0, 0, 1, 1, 'ICD9 Diagnosis', 4, 1, 0, 0);
+INSERT INTO code_types (ct_key, ct_id, ct_seq, ct_mod, ct_just, ct_fee, ct_rel, ct_nofs, ct_diag, ct_active, ct_label, ct_external, ct_claim, ct_proc, ct_term ) VALUES ('CPT4' , 1, 2, 12, 'ICD9', 1, 0, 0, 0, 1, 'CPT4 Procedure/Service', 0, 1, 1, 0);
+INSERT INTO code_types (ct_key, ct_id, ct_seq, ct_mod, ct_just, ct_fee, ct_rel, ct_nofs, ct_diag, ct_active, ct_label, ct_external, ct_claim, ct_proc, ct_term ) VALUES ('HCPCS', 3, 3, 12, 'ICD9', 1, 0, 0, 0, 1, 'HCPCS Procedure/Service', 0, 1, 1, 0);
+INSERT INTO code_types (ct_key, ct_id, ct_seq, ct_mod, ct_just, ct_fee, ct_rel, ct_nofs, ct_diag, ct_active, ct_label, ct_external, ct_claim, ct_proc, ct_term ) VALUES ('CVX'  , 100, 100, 0, '', 0, 0, 1, 0, 1, 'CVX Immunization', 0, 0, 0, 0);
+INSERT INTO code_types (ct_key, ct_id, ct_seq, ct_mod, ct_just, ct_fee, ct_rel, ct_nofs, ct_diag, ct_active, ct_label, ct_external, ct_claim, ct_proc, ct_term ) VALUES ('DSMIV' , 101, 101, 0, '', 0, 0, 0, 1, 0, 'DSMIV Diagnosis', 0, 1, 0, 0);
+INSERT INTO code_types (ct_key, ct_id, ct_seq, ct_mod, ct_just, ct_fee, ct_rel, ct_nofs, ct_diag, ct_active, ct_label, ct_external, ct_claim, ct_proc, ct_term ) VALUES ('ICD10' , 102, 102, 0, '', 0, 0, 0, 1, 0, 'ICD10 Diagnosis', 1, 1, 0, 0);
+INSERT INTO code_types (ct_key, ct_id, ct_seq, ct_mod, ct_just, ct_fee, ct_rel, ct_nofs, ct_diag, ct_active, ct_label, ct_external, ct_claim, ct_proc, ct_term ) VALUES ('SNOMED' , 103, 103, 0, '', 0, 0, 0, 1, 0, 'SNOMED Diagnosis', 2, 1, 0, 0);
+INSERT INTO code_types (ct_key, ct_id, ct_seq, ct_mod, ct_just, ct_fee, ct_rel, ct_nofs, ct_diag, ct_active, ct_label, ct_external, ct_claim, ct_proc, ct_term ) VALUES ('CPTII' , 104, 104, 0, 'ICD9', 0, 0, 0, 0, 0, 'CPTII Performance Measures', 0, 1, 0, 0);
+INSERT INTO code_types (ct_key, ct_id, ct_seq, ct_mod, ct_just, ct_fee, ct_rel, ct_nofs, ct_diag, ct_active, ct_label, ct_external, ct_claim, ct_proc, ct_term ) VALUES ('ICD9-SG' , 105, 105, 12, 'ICD9', 1, 0, 0, 0, 0, 'ICD9 Procedure/Service', 5, 1, 1, 0);
+INSERT INTO code_types (ct_key, ct_id, ct_seq, ct_mod, ct_just, ct_fee, ct_rel, ct_nofs, ct_diag, ct_active, ct_label, ct_external, ct_claim, ct_proc, ct_term ) VALUES ('ICD10-PCS' , 106, 106, 12, 'ICD10', 1, 0, 0, 0, 0, 'ICD10 Procedure/Service', 6, 1, 1, 0);
+INSERT INTO code_types (ct_key, ct_id, ct_seq, ct_mod, ct_just, ct_fee, ct_rel, ct_nofs, ct_diag, ct_active, ct_label, ct_external, ct_claim, ct_proc, ct_term ) VALUES ('SNOMED-CT' , 107, 107, 0, '', 0, 0, 0, 0, 0, 'SNOMED Clinical Term', 7, 0, 0, 1);
 
 INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('lists', 'code_types', 'Code Types', 1);
 
@@ -5128,12 +5510,14 @@ INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES (
 INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('disclosure_type', 'disclosure-healthcareoperations', 'Health Care Operations', 30, 0);
 
 INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('lists'   ,'smoking_status','Smoking Status', 1,0);
-INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('smoking_status', '1', 'Current every day smoker', 10, 0);
-INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('smoking_status', '2', 'Current some day smoker', 20, 0);
-INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('smoking_status', '3', 'Former smoker', 30, 0);
-INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('smoking_status', '4', 'Never smoker', 40, 0);
-INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('smoking_status', '5', 'Smoker, current status unknown', 50, 0);
-INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('smoking_status', '9', 'Unknown if ever smoked', 60, 0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default, codes ) VALUES ('smoking_status', '1', 'Current every day smoker', 10, 0, 'SNOMED-CT:449868002');
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default, codes ) VALUES ('smoking_status', '2', 'Current some day smoker', 20, 0, 'SNOMED-CT:428041000124106');
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default, codes ) VALUES ('smoking_status', '3', 'Former smoker', 30, 0, 'SNOMED-CT:8517006');
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default, codes ) VALUES ('smoking_status', '4', 'Never smoker', 40, 0, 'SNOMED-CT:266919005');
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default, codes ) VALUES ('smoking_status', '5', 'Smoker, current status unknown', 50, 0, 'SNOMED-CT:77176002');
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default, codes ) VALUES ('smoking_status', '9', 'Unknown if ever smoked', 60, 0, 'SNOMED-CT:266927001');
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default, codes ) VALUES ('smoking_status', '15', 'Heavy tobacco smoker', 70, 0, 'SNOMED-CT:428071000124103');
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default, codes ) VALUES ('smoking_status', '16', 'Light tobacco smoker', 80, 0, 'SNOMED-CT:428061000124105');
 
 INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('lists'   ,'race','Race', 1,0);
 INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('race', 'amer_ind_or_alaska_native', 'American Indian or Alaska Native', 10, 0);
@@ -5175,9 +5559,10 @@ CREATE TABLE version (
   v_patch    int(11)     NOT NULL DEFAULT 0,
   v_realpatch int(11)    NOT NULL DEFAULT 0,
   v_tag      varchar(31) NOT NULL DEFAULT '',
-  v_database int(11)     NOT NULL DEFAULT 0
+  v_database int(11)     NOT NULL DEFAULT 0,
+  v_acl      int(11)     NOT NULL DEFAULT 0
 ) ENGINE=MyISAM;
-INSERT INTO version (v_major, v_minor, v_patch, v_realpatch, v_tag, v_database) VALUES (0, 0, 0, 0, '', 0);
+INSERT INTO version (v_major, v_minor, v_patch, v_realpatch, v_tag, v_database, v_acl) VALUES (0, 0, 0, 0, '', 0, 0);
 -- --------------------------------------------------------
 
 --

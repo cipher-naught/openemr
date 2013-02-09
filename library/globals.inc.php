@@ -22,6 +22,7 @@
 //   Arabic                         // xl('Arabic')
 //   Armenian                       // xl('Armenian')
 //   Bahasa Indonesia               // xl('Bahasa Indonesia')
+//   Bengali                        // xl('Bengali')
 //   Chinese (Simplified)           // xl('Chinese (Simplified)')
 //   Chinese (Traditional)          // xl('Chinese (Traditional)')
 //   Czech                          // xl('Czech')
@@ -29,6 +30,7 @@
 //   Dutch                          // xl('Dutch')
 //   English (Indian)               // xl('English (Indian)')
 //   English (Standard)             // xl('English (Standard)')
+//   Estonian                       // xl('Estonian')
 //   French                         // xl('French (Standard)')
 //   French                         // xl('French (Canadian)')
 //   German                         // xl('German')
@@ -38,6 +40,7 @@
 //   Hungarian                      // xl('Hungarian')
 //   Italian                        // xl('Italian')
 //   Norwegian                      // xl('Norwegian')
+//   Persian                        // xl('Persian')
 //   Polish                         // xl('Polish')
 //   Portuguese (Brazilian)         // xl('Portuguese (Brazilian)')
 //   Portuguese (European)          // xl('Portuguese (European)')
@@ -84,7 +87,10 @@ $USER_SPECIFIC_TABS = array('Appearance',
 $USER_SPECIFIC_GLOBALS = array('default_top_pane',
                                'concurrent_layout',
                                'css_header',
+                               'gbl_pt_list_page_size',
+                               'gbl_pt_list_new_window',
                                'units_of_measurement',
+                               'us_weight_format',
                                'date_display_format',
                                'time_display_format',
                                'event_color',
@@ -203,6 +209,21 @@ $GLOBALS_METADATA = array(
       xl('Enables the old Charges panel for entering billing codes and payments. Not recommended, use the Fee Sheet instead.')
     ),
 
+    // TajEmo Work BY CB 2012/06/21 10:42:31 AM added option to Hide Fees
+    'enable_fees_in_left_menu' => array(
+      xl('Enable Fees In Left Menu'),
+      'bool',                           // data type
+      '1',                              // default = true
+      xl('Enable Fees In Left Menu')
+    ),
+    // EDI history  2012-09-13 
+    'enable_edihistory_in_left_menu' => array(
+      xl('Enable EDI History In Left Menu'),
+      'bool',                           // data type
+      '1',                              // default = true
+      xl('EDI History (under Fees) for storing and interpreting EDI claim response files')
+    ),
+    //
     'online_support_link' => array(
       xl('Online Support Link'),
       'text',                           // data type
@@ -223,7 +244,26 @@ $GLOBALS_METADATA = array(
       ),
       '20',
       xl('Number of encounters to display per page.')
-    )      
+    ),
+
+    'gbl_pt_list_page_size' => array(
+      xl('Patient List Page Size'),
+      array(
+        '10'  =>  '10',
+        '25'  =>  '25',
+        '50'  =>  '50',
+        '100' => '100',
+      ),
+      '10',
+      xl('Number of patients to display per page in the patient list.')
+    ),
+
+    'gbl_pt_list_new_window' => array(
+      xl('Patient List New Window'),
+      'bool',                           // data type
+      '0',                              // default = false
+      xl('Default state of New Window checkbox in the patient list.')
+    ),
 
   ),
 
@@ -312,7 +352,17 @@ $GLOBALS_METADATA = array(
       '1',                              // default = Both/US
       xl('Applies to the Vitals form and Growth Chart')
     ),
-
+    
+    'us_weight_format' => array(
+        xl('Display Format for US Weights'),
+        array(
+            '1'=>xl('Show pounds as decimal value'),
+            '2'=>xl('Show pounds and ounces')
+        ),
+        '1',
+        xl('Applies to Vitals form')
+    )
+      ,
     'disable_deprecated_metrics_form' => array(
       xl('Disable Old Metric Vitals Form'),
       'bool',                           // data type
@@ -557,6 +607,13 @@ $GLOBALS_METADATA = array(
       '0',                              // default = false
       xl('This will force the Billing Widget in the Patient Summary screen to always be open.')
     ),
+      
+    'num_past_appointments_to_show' => array(
+      xl('Past Appointment Display Widget'),
+      'num',                           // data type
+      '0',                             // default = false
+      xl('A positive number will show that many past appointments on a Widget in the Patient Summary screen.')
+    ),      
 
     'activate_ccr_ccd_report' => array(
       xl('Activate CCR/CCD Reporting'),
@@ -580,6 +637,55 @@ $GLOBALS_METADATA = array(
     ),
 
   ),
+    
+    //Documents Tab
+    'Documents' => array(
+        'document_storage_method' => array(
+            xl('Document Storage Method'),
+            array(
+                '0' => xl('Hard Disk'),
+                '1' => xl('CouchDB')
+            ),
+            '0',                              // default
+            xl('Option to save method of document storage.')
+        ),
+        'couchdb_host' => array(
+            xl('CouchDB HostName'),
+            'text',
+            'localhost',
+            xl('CouchDB host'),
+        ),
+        'couchdb_user' => array(
+            xl('CouchDB UserName'),
+            'text',
+            '',
+            xl('Username to connect to CouchDB'),
+        ),
+        'couchdb_pass' => array(
+            xl('CouchDB Password'),
+            'text',
+            '',
+            xl('Password to connect to CouchDB'),
+        ),
+        'couchdb_port' => array(
+            xl('CouchDB Port'),
+            'text',
+            '5984',
+            xl('CouchDB port'),
+        ),
+        'couchdb_dbase' => array(
+            xl('CouchDB Database'),
+            'text',
+            '',
+            xl('CouchDB database name'),
+        ),
+        'couchdb_log' => array(
+            xl('CouchDB Log Enable'),
+            'bool',
+            '0',
+            xl('Enable log for document uploads/downloads to CouchDB'),
+        ),
+    ),
 
   // Calendar Tab
   //
@@ -936,6 +1042,32 @@ $GLOBALS_METADATA = array(
       '1',                               // default
       xl('Enable Reporting of Tracking Date For Automated Measure Calculations (AMC)')
     ),
+
+    'cdr_report_nice' => array(
+      xl('CDR Reports Processing Priority'),
+      array(
+        '' => xl('Default Priority'),
+        '5' => xl('Moderate Priority'),
+        '10' => xl('Moderate/Low Priority'),
+        '15' => xl('Low Priority'),
+        '20' => xl('Lowest Priority')
+      ),
+      '',                               // default
+      xl('Set processing priority for CDR engine based reports.')
+    ),
+
+    'pat_rem_clin_nice' => array(
+      xl('Patient Reminder Creation Processing Priority'),
+      array(
+        '' => xl('Default Priority'),
+        '5' => xl('Moderate Priority'),
+        '10' => xl('Moderate/Low Priority'),
+        '15' => xl('Low Priority'),
+        '20' => xl('Lowest Priority')
+      ),
+      '',                               // default
+      xl('Set processing priority for creation of Patient Reminders (in full clinic mode).')
+    ),
  
   ),
 
@@ -997,6 +1129,13 @@ $GLOBALS_METADATA = array(
       'bool',                           // data type
       '0',                              // default
       xl('Enable logging of all SQL SELECT queries.').' ('.xl('Note that Audit Logging needs to be enabled above').')'
+    ),
+
+    'audit_events_cdr' => array(
+      xl('Audit CDR Engine Queries'),
+      'bool',                           // data type
+      '0',                              // default
+      xl('Enable logging of CDR Engine Queries.').' ('.xl('Note that Audit Logging needs to be enabled above').')'
     ),
 
     'enable_atna_audit' => array(
@@ -1228,6 +1367,13 @@ $GLOBALS_METADATA = array(
       '0',
       xl('Enable Offsite Patient Portal.')
     ),
+
+    'portal_offsite_providerid' => array(
+      xl('Offsite Patient Portal Provider ID'),
+      'text',                           // data type
+      '',
+      xl('Offsite Patient Portal Provider ID(Put Blank If not Registered).')
+    ),    
 
     'portal_offsite_username' => array(
       xl('Offsite Patient Portal Username'),
@@ -1490,6 +1636,6 @@ $GLOBALS_METADATA = array(
       '30',
       xl('Rx Bottom Margin (px)')
     ),
-  ),
+  ),    
 );
 ?>

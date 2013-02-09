@@ -58,9 +58,12 @@ if ($_POST['formaction']=='save' && $list_id) {
         $ct_active = empty($iter['ct_active' ]) ? 0 : 1;
         $ct_label = formTrim($iter['ct_label']);
         $ct_external = formTrim($iter['ct_external']) + 0;
+        $ct_claim = empty($iter['ct_claim']) ? 0 : 1;
+        $ct_proc = empty($iter['ct_proc']) ? 0 : 1;
+        $ct_term = empty($iter['ct_term']) ? 0 : 1;
         if (strlen($ct_key) > 0 && $ct_id > 0) {
           sqlInsert("INSERT INTO code_types ( " .
-            "ct_key, ct_id, ct_seq, ct_mod, ct_just, ct_mask, ct_fee, ct_rel, ct_nofs, ct_diag, ct_active, ct_label, ct_external " .
+            "ct_key, ct_id, ct_seq, ct_mod, ct_just, ct_mask, ct_fee, ct_rel, ct_nofs, ct_diag, ct_active, ct_label, ct_external, ct_claim, ct_proc, ct_term " .
             ") VALUES ( "   .
             "'$ct_key' , " .
             "'$ct_id'  , " .
@@ -74,7 +77,10 @@ if ($_POST['formaction']=='save' && $list_id) {
             "'$ct_diag', " .
             "'$ct_active', " .
             "'$ct_label', " .
-            "'$ct_external' " .
+            "'$ct_external', " .
+            "'$ct_claim', " .
+            "'$ct_proc', " .
+            "'$ct_term' " .
             ")");
         }
       }
@@ -100,7 +106,7 @@ if ($_POST['formaction']=='save' && $list_id) {
               if ($list_id == 'lbfnames' && substr($id,0,3) != 'LBF')
                 $id = "LBF$id";
               sqlInsert("INSERT INTO list_options ( " .
-                "list_id, option_id, title, seq, is_default, option_value, mapping, notes " .
+                "list_id, option_id, title, seq, is_default, option_value, mapping, notes, codes " .
                 ") VALUES ( " .
                 "'$list_id', "                       .
                 "'" . $id                        . "', " .
@@ -109,7 +115,8 @@ if ($_POST['formaction']=='save' && $list_id) {
                 "'" . formTrim($iter['default']) . "', " .
                 "'" . $value                     . "', " .
                 "'" . formTrim($iter['mapping']) . "', " .
-                "'" . formTrim($iter['notes'])   . "' "  .
+                "'" . formTrim($iter['notes'])   . "', " .
+                "'" . formTrim($iter['codes'])   . "' " .
                 ")");
             }
         }
@@ -145,6 +152,7 @@ $opt_line_no = 0;
 
 // Given a string of multiple instances of code_type|code|selector,
 // make a description for each.
+// @TODO Instead should use a function from custom/code_types.inc.php and need to remove casing functions
 function getCodeDescriptions($codes) {
   global $code_types;
   $arrcodes = explode('~', $codes);
@@ -175,7 +183,7 @@ function getCodeDescriptions($codes) {
 
 // Write one option line to the form.
 //
-function writeOptionLine($option_id, $title, $seq, $default, $value, $mapping='', $notes='') {
+function writeOptionLine($option_id, $title, $seq, $default, $value, $mapping='', $notes='', $codes='') {
   global $opt_line_no, $list_id;
   ++$opt_line_no;
   $bgcolor = "#" . (($opt_line_no & 1) ? "ddddff" : "ffdddd");
@@ -285,6 +293,12 @@ function writeOptionLine($option_id, $title, $seq, $default, $value, $mapping=''
       htmlspecialchars($notes, ENT_QUOTES) . "' size='25' maxlength='255' class='optin' />";
   echo "</td>\n";
 
+  echo "  <td align='center' class='optcell'>";
+  echo "<input type='text' name='opt[$opt_line_no][codes]' title='" .
+      xla('Clinical Term Code(s)') ."' value='" .
+      htmlspecialchars($codes, ENT_QUOTES) . "' onclick='select_clin_term_code(this)' size='25' maxlength='255' class='optin' />";
+  echo "</td>\n";
+
   echo " </tr>\n";
 }
 
@@ -362,7 +376,7 @@ function ctGenCbox($opt_line_no, $ct_array, $name, $title='') {
 // Write a form line as above but for the special case of Code Types.
 //
 function writeCTLine($ct_array) {
-  global $opt_line_no;
+  global $opt_line_no,$cd_external_options;
 
   ++$opt_line_no;
   $bgcolor = "#" . (($opt_line_no & 1) ? "ddddff" : "ffdddd");
@@ -385,17 +399,31 @@ function writeCTLine($ct_array) {
     xl('If billing justification is used enter the name of the diagnosis code type.'));
   echo ctGenCell($opt_line_no, $ct_array, 'ct_mask', 6,  9,
     xl('Specifies formatting for codes. # = digit, @ = alpha, * = any character. Empty if not used.'));
+  echo ctGenCBox($opt_line_no, $ct_array, 'ct_claim',
+    xl('Is this code type used in claims?'));
   echo ctGenCBox($opt_line_no, $ct_array, 'ct_fee',
     xl('Are fees charged for this type?'));
   echo ctGenCBox($opt_line_no, $ct_array, 'ct_rel',
     xl('Does this type allow related codes?'));
   echo ctGenCBox($opt_line_no, $ct_array, 'ct_nofs',
     xl('Is this type hidden in the fee sheet?'));
+  echo ctGenCBox($opt_line_no, $ct_array, 'ct_proc',
+    xl('Is this a procedure/service type?'));
   echo ctGenCBox($opt_line_no, $ct_array, 'ct_diag',
     xl('Is this a diagnosis type?'));
-  echo ctGenCell($opt_line_no, $ct_array, 'ct_external' , 1,  2,
-    xl('Are the codes stored in external sql tables (0-No, 1-ICD10, 2-SNOMED(RF1), 3-SNOMED(RF2)) ?'));
-
+  echo ctGenCBox($opt_line_no, $ct_array, 'ct_term',
+    xl('Is this a Clinical Term code type?'));
+  // Show the external code types selector
+  $value_ct_external = isset($ct_array['ct_external']) ? $ct_array['ct_external'] : '';
+  echo "  <td title='" . xla('Is this using external sql tables? If it is, then choose the format.') . "' align='center' class='optcell'>";
+  echo "<select name='opt[$opt_line_no][ct_external]' class='optin'>";
+  foreach ( $cd_external_options as $key => $desc) {
+    echo "<option value='" . attr($key) . "'";
+    if ($key == $value_ct_external) echo " selected";
+    echo ">" . text($desc) . "</option>";
+  }
+  echo "</select>";
+  echo "</td>\n";
   echo " </tr>\n";
 }
 ?>
@@ -496,9 +524,23 @@ function select_code(lino) {
  return false;
 }
 
+// This invokes the find-code popup.
+// For CVX/immunization code administration.
+function sel_cvxcode(e) {
+ current_sel_name = e.name;
+ dlgopen('../patient_file/encounter/find_code_popup.php?codetype=CVX', '_blank', 500, 400);
+}
+
+// This invokes the find-code popup.
+// For CVX/immunization code administration.
+function select_clin_term_code(e) {
+ current_sel_clin_term = e.name;
+ dlgopen('../patient_file/encounter/find_code_popup.php?codetype=<?php echo attr(collect_codetypes("clinical_term","csv")) ?>', '_blank', 500, 400);
+}
+
 // This is for callback by the find-code popup.
 function set_related(codetype, code, selector, codedesc) {
- if (typeof(current_sel_name) == 'undefined')
+ if (typeof(current_sel_name) == 'undefined' && typeof(current_sel_clin_term) == 'undefined')
  {
  // Coming from Fee Sheet edit
   var f = document.forms[0];
@@ -522,8 +564,20 @@ function set_related(codetype, code, selector, codedesc) {
   }
   displayCodes(current_lino);
  }
- else
- {
+ else if (typeof(current_sel_name) == 'undefined') {
+  // Coming from the Clinical Terms Code(s) edit
+     var f = document.forms[0][current_sel_clin_term];
+     var s = f.value;
+     if (code) {
+         if (s.length > 0) s += ';';
+         s += codetype + ':' + code;
+     }
+     else {
+         s = '';
+     }
+     f.value = s;
+ }
+ else {
   // Coming from Immunizations edit
      var f = document.forms[0][current_sel_name];
      var s = f.value;
@@ -566,12 +620,6 @@ function mysubmit() {
   }
  }
  f.submit();
-}
-
-// This invokes the find-code popup.
-function sel_cvxcode(e) {
- current_sel_name = e.name;
- dlgopen('../patient_file/encounter/find_code_popup.php?codetype=CVX', '_blank', 500, 400);
 }
 
 </script>
@@ -638,10 +686,13 @@ while ($row = sqlFetchArray($res)) {
   <td><b><?php xl('ModLength'   ,'e'); ?></b></td>
   <td><b><?php xl('Justify'     ,'e'); ?></b></td>
   <td><b><?php xl('Mask'        ,'e'); ?></b></td>
+  <td><b><?php xl('Claims'      ,'e'); ?></b></td>
   <td><b><?php xl('Fees'        ,'e'); ?></b></td>
   <td><b><?php xl('Relations'   ,'e'); ?></b></td>
   <td><b><?php xl('Hide'        ,'e'); ?></b></td>
+  <td><b><?php xl('Procedure'   ,'e'); ?></b></td>
   <td><b><?php xl('Diagnosis'   ,'e'); ?></b></td>
+  <td><b><?php xl('Clinical Term','e'); ?></b></td>
   <td><b><?php xl('External'    ,'e'); ?></b></td>
 <?php } else { ?>
   <td title=<?php xl('Click to edit','e','\'','\''); ?>><b><?php  xl('ID','e'); ?></b></td>
@@ -667,7 +718,8 @@ while ($row = sqlFetchArray($res)) {
 <?php } if ($GLOBALS['ippf_specific']) { ?>
   <td><b><?php xl('Global ID','e'); ?></b></td>
 <?php } ?>
-  <td><b><?php xl('Notes','e'); ?></b></td>	
+  <td><b><?php xl('Notes','e'); ?></b></td>
+  <td><b><?php xl('Code(s)','e'); ?></b></td>
 <?php } // end not fee sheet ?>
  </tr>
 
@@ -700,7 +752,7 @@ if ($list_id) {
     while ($row = sqlFetchArray($res)) {
       writeOptionLine($row['option_id'], $row['title'], $row['seq'],
         $row['is_default'], $row['option_value'], $row['mapping'],
-        $row['notes']);
+        $row['notes'],$row['codes']);
     }
     for ($i = 0; $i < 3; ++$i) {
       writeOptionLine('', '', '', '', 0);

@@ -35,18 +35,6 @@ if ($ISSUE_TYPES['ippf_gcac']) {
   require_once("$srcdir/ippf_issues.inc.php");
 }
 
-$diagnosis_types = array();
-foreach ($code_types as $code => $data) {
-	if ($data['diag']) {
-		array_push($diagnosis_types, $code);
-	}
-}
-if (count($diagnosis_types) < 1) {
-	$diagnosis_type = 'ICD9';
-} else {
-	$diagnosis_type = csv_like_join($diagnosis_types);
-}
-
 $issue = $_REQUEST['issue'];
 $thispid = 0 + (empty($_REQUEST['thispid']) ? $pid : $_REQUEST['thispid']);
 $info_msg = "";
@@ -57,9 +45,8 @@ $thisenc = 0 + (empty($_REQUEST['thisenc']) ? 0 : $_REQUEST['thisenc']);
 // A nonempty thistype is an issue type to be forced for a new issue.
 $thistype = empty($_REQUEST['thistype']) ? '' : $_REQUEST['thistype'];
 
-$thisauth = acl_check('patients', 'med');
-if ($issue && $thisauth != 'write') die(xlt("Edit is not authorized!"));
-if ($thisauth != 'write' && $thisauth != 'addonly') die(xlt("Add is not authorized!"));
+if ($issue && !acl_check('patients','med','','write') ) die(xlt("Edit is not authorized!"));
+if ( !acl_check('patients','med','',array('write','addonly') )) die(xlt("Add is not authorized!"));
 
 $tmp = getPatientData($thispid, "squad");
 if ($tmp['squad'] && ! acl_check('squads', $tmp['squad']))
@@ -444,7 +431,7 @@ function set_related(codetype, code, selector, codedesc) {
 
 // This invokes the find-code popup.
 function sel_diagnosis() {
- dlgopen('../encounter/find_code_popup.php?codetype=<?php echo attr($diagnosis_type) ?>', '_blank', 500, 400);
+ dlgopen('../encounter/find_code_popup.php?codetype=<?php echo attr(collect_codetypes("diagnosis","csv")) ?>', '_blank', 500, 400);
 }
 
 // Check for errors when the form is submitted.

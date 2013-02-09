@@ -73,10 +73,20 @@ $res = sqlQuery("select * from users where username='".$_SESSION{"authUser"}."'"
 <tr>
 <td align="left">
 <?php if ($GLOBALS['concurrent_layout']) { ?>
-	<table cellspacing="0" cellpadding="1" style="margin:0px 0px 0px 3px;"><tr><td style="vertical-align:text-bottom;">
+	<table cellspacing="0" cellpadding="1" style="margin:0px 0px 0px 3px;">
+
+<?php if (acl_check('patients','demo','',array('write','addonly') )) { ?>
+<tr><td style="vertical-align:text-bottom;">
 		<a href='' class="css_button_small" style="margin:0px;vertical-align:top;" id='new0' onClick=" return top.window.parent.left_nav.loadFrame2('new0','RTop','new/new.php')">
-		<span><?php echo htmlspecialchars( xl('NEW PATIENT'), ENT_QUOTES) ?></span></a>
-	</td></tr>
+		<span><?php echo htmlspecialchars( xl('NEW PATIENT'), ENT_QUOTES); ?></span></a>
+    </td>
+    <td style="vertical-align:text-bottom;">
+            <a href='' class="css_button_small" style="margin:0px;vertical-align:top;display:none;" id='clear_active' onClick="javascript:parent.left_nav.clearactive();return false;">
+            <span><?php echo htmlspecialchars( xl('CLEAR ACTIVE PATIENT'), ENT_QUOTES); ?></span></a>
+    </td>
+</tr>
+<?php } //end of acl_check('patients','demo','',array('write','addonly') if ?>
+
 	<tr><td valign="baseline"><B>
 		<a class="text" style='vertical-align:text-bottom;' href="main_title.php" id='showMenuLink' onclick='javascript:showhideMenu();return false;'><?php xl('Hide Menu','e'); ?></a></B>
 	</td></tr></table>
@@ -104,7 +114,7 @@ $res = sqlQuery("select * from users where username='".$_SESSION{"authUser"}."'"
 	<table cellspacing="0" cellpadding="1" style="margin:0px 3px 0px 0px;"><tr>
 		<td align="right" class="text" style="vertical-align:text-bottom;"><a href='main_title.php' onclick="javascript:parent.left_nav.goHome();return false;" ><?php xl('Home','e'); ?></a>
 		&nbsp;|&nbsp;
-		<a href="http://open-emr.org/wiki/index.php/OpenEMR_4.1_Users_Guide" target="_blank" id="help_link" >
+		<a href="http://open-emr.org/wiki/index.php/OpenEMR_4.1.1_Users_Guide" target="_blank" id="help_link" >
 			<?php xl('Manual','e'); ?></a>&nbsp;</td>
 		<td align="right" style="vertical-align:top;"><a href="../logout.php?auth=logout" target="_top" class="css_button_small" style='float:right;' id="logout_link" onclick="top.restoreSession()" >
 			<span><?php echo htmlspecialchars( xl('Logout'), ENT_QUOTES) ?></span></a></td>
@@ -115,6 +125,10 @@ $res = sqlQuery("select * from users where username='".$_SESSION{"authUser"}."'"
 </td>
 </tr>
 </table>
+
+<script type="text/javascript" language="javascript">
+parent.loadedFrameCount += 1;
+</script>
 
 </body>
 </html>
