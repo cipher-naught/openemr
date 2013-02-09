@@ -7,7 +7,7 @@
 // as published by the Free Software Foundation; either version 2
 // of the License, or (at your option) any later version.
 
-require_once dirname(__FILE__) ."/../../../../../library/classes/DataImportTable.php";
+require_once dirname(__FILE__) ."/../../../../../library/classes/dataImportTable.php";
 
 class Zend_Helper_TableViewHelper extends Zend_View_Helper_Abstract
 {
