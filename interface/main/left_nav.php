@@ -1273,6 +1273,8 @@ if (!empty($reg)) {
           <?php if ( (!$GLOBALS['disable_phpmyadmin_link']) && (acl_check('admin', 'database')) ) genMiscLink('RTop','adm','0',xl('Database'),'../phpmyadmin/index.php'); ?>
           <?php if (acl_check('admin', 'users'   )) genMiscLink('RTop','adm','0',xl('Certificates'),'usergroup/ssl_certificates_admin.php'); ?>
           <?php if (acl_check('admin', 'super'   )) genMiscLink('RTop','adm','0',xl('External Data Loads'),'../interface/code_systems/dataloads_ajax.php'); ?>
+          <?php if (acl_check('admin', 'super'   )) genMiscLink('RTop','adm','0',xl('SNOMED'),'../interface/code_systems/standard_tables_manage.php?mode=snomed'); ?>
+		  <?php if (acl_check('admin', 'super'   ) && ((!isset($GLOBALS['enable_Data_Import_in_left_menu']) || $GLOBALS['enable_Data_Import_in_left_menu'] == 1))) genMiscLink('RTop','adm','0',xl('Data Import'),'../modules/dataImporter/public/importer/form'); ?>
         </ul>
       </li>
     </ul>
