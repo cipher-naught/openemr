@@ -226,9 +226,11 @@ class Application_Form_Importer extends Zend_Form
     	$element->addValidator('Count', false, 1);
     	$element->addValidator('Size',false,29*1024*1024);
     	$element->setAttrib("class", "file");
+    	
     	    	
     	$element->removeDecorator('DtDdWrapper');
     	$this->clearDecorators($element);
+    	
     	$this->addElement($element, 'dataFile');
     	
     	$fieldDelimit = $this->createFieldDelimitSelectList('fieldDelimit');
@@ -254,7 +256,11 @@ class Application_Form_Importer extends Zend_Form
 
     	$fileUpload = new Zend_Form_Element_Submit('uploadFile');
     	
-    	$fileUpload->setLabel("Upload File");
+    	$fileUpload->setLabel("Upload");
+    	$fileUpload->setAttribs(array(
+    			"style" => "width:90px;"
+    			)
+    	);
     	
     	$this->clearDecorators($fileUpload);
     	$fileUpload->removeDecorator('DtDdWrapper');

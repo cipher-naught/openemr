@@ -30,7 +30,12 @@ $this->form->setAction($this->url());
 var W3CDOM = (document.createElement && document.getElementsByTagName);
 
 function init() {
+	document.getElementById("dataFile").onchange = 
+		function() {
+		document.getElementById("fakeFileInputBox").value  = document.getElementById("dataFile").value;
+	};
 	if (!W3CDOM) return;
+	
 	processTableChoicesAndMatching();
 	
 }
@@ -395,29 +400,38 @@ span.fullRow {
 <form method="<?php echo $form->getMethod() ?>" action="<?php echo $form->getAction()?>" enctype="<?php echo $form->getAttrib('enctype')?>">
 <?php echo $form->getElement('hidTableData')->render(); ?><?php echo $form->getElement('hidPostBackAction')->render(); ?>
 
+Data Importer
 <div id="upperContainer">
 			<div id="fileImport">
-				File to Import <br/>
+				File Selection <br/>
 				<!--  File processor -->
 
 						<div class="fileinputs">
 							
 							<?php echo $form->getElement('dataFile')->render(); ?>
 							<div class="fakeFile" >
-								<input size="80" disabled=""> Select <img src="<?php echo $GLOBALS['web_root'];?>/images/button_select_clickOnly.gif" />
-								<?php echo $form->getElement('uploadFile')->render(); ?>
+								<input size="80" disabled="" id="fakeFileInputBox"> 
+								
+								<!-- 			
+								Select <img src="<?php echo $GLOBALS['web_root'];?>/images/button_select_clickOnly.gif" />
+								 -->
+								 
+								 <input type="submit" value="Select" style="width:90px"></input>
 							</div>
 						</div>
-						
-
-				<br/>
+					<br/>
 				<div style="float:left; margin-top:10px">
 					<div style="width:100px;float:left">
-						<?php echo $form->getElement('Preview')->render(); ?>
+						<?php echo $form->getElement('uploadFile')->render(); ?>
 						<?php echo $form->getElement('Delete')->render(); ?>
+						<div style="height: 4px;"></div>
+						<?php echo $form->getElement('Preview')->render(); ?>
+						
 						<?php echo $form->getElement('processFile')->render(); ?>
 					</div>
+					
 					<div style="float:right;width=600px;">
+					Uploaded Files
 					<?php echo $form->getElement('fileList')->render(); ?>
 					</div>
 				</div>
@@ -471,23 +485,23 @@ span.fullRow {
             
             <ol>
 	            <li>
-	            	<?php echo $form->getElement('matchLName')->render(); ?><label for="matchLName">Last Name</label>
+	            	<label for="matchLName">Last Name</label><?php echo $form->getElement('matchLName')->render(); ?>
 	            </li> 
 	            
 		    	<li>
-		    		<?php echo $form->getElement('matchFName')->render(); ?><label for="matchFName">First Name</label>
+		    		<label for="matchFName">First Name</label><?php echo $form->getElement('matchFName')->render(); ?>
 		    	</li>
 		    	<li>
-		    		<?php echo $form->getElement('matchMName')->render(); ?><label for="matchMName">Middle Name</label>
+		    		<label for="matchMName">Middle Name</label><?php echo $form->getElement('matchMName')->render(); ?>
 		    	</li>
 		    	<li>
-		    		<?php echo $form->getElement('matchSS')->render(); ?><label for="matchSS">SS</label>
+		    		<label for="matchSS">SS</label><?php echo $form->getElement('matchSS')->render(); ?>
 		    	</li>
 		    	<li>
-		    		<?php echo $form->getElement('matchDateOfBirth')->render(); ?><label for="matchDateOfBirth">Date of Birth</label>
+		    		<label for="matchDateOfBirth">Date of Birth</label><?php echo $form->getElement('matchDateOfBirth')->render(); ?>
 		    	</li>
 		    	<li>
-		    		<?php echo $form->getElement('matchSex')->render(); ?><label for="matchSex">Sex</label>
+		    		<label for="matchSex">Sex</label><?php echo $form->getElement('matchSex')->render(); ?>
 		    	</li>
 		    	<li>	
 		    		<?php echo $form->getElement('matchPatient_Id')->render(); ?><label for="matchPatient_Id">Patient_ID</label>
@@ -557,7 +571,9 @@ span.fullRow {
 ?>
 </div>
 </form>
-<script type="text/javascript">init();</script>
+<script type="text/javascript">
+init();
+</script>
 
 </body>
 </html>
